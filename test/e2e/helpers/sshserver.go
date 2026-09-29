@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -120,7 +121,7 @@ func (s *SSHServer) WriteInstancesYAML(t *testing.T, dir string) string {
 
 func (s *SSHServer) waitReady(timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
-	addr := fmt.Sprintf("%s:%d", s.Host, s.Port)
+	addr := net.JoinHostPort(s.Host, strconv.Itoa(s.Port))
 	for time.Now().Before(deadline) {
 		out, err := exec.Command("ssh-keyscan", "-p", fmt.Sprintf("%d", s.Port), s.Host).Output()
 		if err == nil && strings.Contains(string(out), "ssh") {
