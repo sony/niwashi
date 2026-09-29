@@ -81,7 +81,7 @@ docs-lint:
 
 # Collect license texts for all dependencies linked into the binary, into ./LICENSES
 licenses:
-	GOROOT=$(shell go env GOROOT) go run github.com/google/go-licenses@v1.6.0 save ./cmd/nwsctl --save_path=./LICENSES --force --ignore github.com/sony/niwashi
+	GOTOOLCHAIN=$(shell go env GOVERSION) GOROOT=$(shell go env GOROOT) go run github.com/google/go-licenses@v1.6.0 save ./cmd/nwsctl --save_path=./LICENSES --force --ignore github.com/sony/niwashi
 
 ##################################
 # Test targets

@@ -1,6 +1,6 @@
 # Change Log
 
-## v0.5.3 (2026-09-28)
+## v0.5.3 (2026-09-29)
 
 ### Added
 
@@ -24,14 +24,22 @@
 - When a task fails, `apply` stops starting new jobs, waits for the running tasks, and exits with an error.
 - When a construct fails, the capability (including its `store/`) or the generator entry is removed from State, so the next run constructs it again.
 
+#### Build
+
+- Go 1.26 or later is now required to build Niwashi (previously Go 1.24).
+
 ### Fixed
 
 - Fix the capability or generator entry being removed from State even when a destruct task failed.
 - Fix errors from job setup and job completion (e.g. State patch failures) not being reported as `apply` failures.
+- Update `golang.org/x/crypto` from v0.46.0 to v0.56.0 to fix vulnerabilities in the SSH transport (GO-2026-5013, GO-2026-5015, GO-2026-5017, GO-2026-5018, GO-2026-5019, GO-2026-5020, GO-2026-5021, GO-2026-6354, GO-2026-6355).
+- Update `github.com/Azure/go-ntlmssp` to v0.1.1 to fix a panic on malformed NTLM challenges in the WinRM transport (GO-2026-5543).
 
 ### Internal
 
 - Add e2e tests for update, prune, and failure handling.
+- Fix the `licenses` Makefile target failing when the installed Go differs from the toolchain in `go.mod`.
+- Use `net.JoinHostPort` in the e2e SSH server helper.
 
 
 ## v0.5.2 (2026-09-11)
