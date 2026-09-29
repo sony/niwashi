@@ -16,7 +16,7 @@ When sharing logs or code snippets in an issue, please double-check that no secr
 
 ## Development
 
-Niwashi requires Go 1.24 or later.
+Niwashi requires Go 1.26 or later.
 
 ```bash
 git clone https://github.com/sony/niwashi.git

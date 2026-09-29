@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Niwashi (`nwsctl`) is a Go CLI for infrastructure provisioning and configuration management. Module `github.com/sony/niwashi`, requires Go 1.24+.
+Niwashi (`nwsctl`) is a Go CLI for infrastructure provisioning and configuration management. Module `github.com/sony/niwashi`, requires Go 1.26+.
 
 ## Build
 
