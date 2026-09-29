@@ -1,0 +1,18 @@
+version: nws.catalog/v1
+recipes:
+  update-cap:
+    path: ./node-cap-update.yaml
+  update-cap-fail:
+    path: ./node-cap-update-fail.yaml
+  update-cap-upgrade-v1:
+    path: ./upgrade-v1.yaml
+  update-cap-upgrade-v2:
+    path: ./upgrade-v2.yaml
+  update-adapter:
+    path: ./update-adapter.yaml
+  update-cap-toolrun:
+    path: ./node-cap-update-toolrun.yaml
+  update-cap-bad-toolrun:
+    path: ./node-cap-update-bad-toolrun.yaml
+  update-cap-no-update:
+    path: ./node-cap-no-update.yaml

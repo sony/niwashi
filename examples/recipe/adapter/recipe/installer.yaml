@@ -1,0 +1,34 @@
+version: nws.recipe/v1
+kind: host
+metadata:
+  id: examples/host.git-installer
+  version: "1.0.0"
+  description: >-
+    Detects `git` on the host running nwsctl and records its path/version in
+    State, so the adapter recipe in this sample can reference it. (Same
+    installer pattern as ../host/ — duplicated here so this sample stays
+    self-contained.)
+spec:
+  provides:
+    - name: examples.host.tool.git
+
+  runtime:
+    type: tool
+    name: examples_git
+
+  tasks:
+    - name: check
+      action:
+        exec.local:
+          scriptTpl: |
+            #!/bin/bash
+            set -euo pipefail
+            BIN="$(command -v git || { echo 'git not found in PATH' >&2; exit 1; })"
+            VER="$(git --version | awk '{print $3}')"
+            jq -n --arg path "$BIN" --arg version "$VER" '{path: $path, version: $version}' \
+              > "{{ .Outputs }}/git_info.json"
+      stateChanges:
+        record-path:
+          op: set
+          path: "/"
+          valueFromFile: "{{ .Outputs }}/git_info.json"

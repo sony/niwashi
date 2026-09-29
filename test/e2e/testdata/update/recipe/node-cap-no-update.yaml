@@ -1,0 +1,14 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: integ-test/update-cap-no-update
+  version: 1.0.0
+spec:
+  # No operation: update task, so a params change cannot be applied.
+  tasks:
+    - name: construct
+      operation: construct
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "construct memory={{ .Params.memory }}"

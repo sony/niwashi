@@ -1,0 +1,13 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: integ-test/construct-fail
+  version: 1.0.0
+spec:
+  tasks:
+    - name: construct
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "construct fails on purpose"
+            exit 1

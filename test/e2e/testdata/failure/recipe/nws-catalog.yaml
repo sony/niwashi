@@ -1,0 +1,10 @@
+version: nws.catalog/v1
+recipes:
+  construct-fail:
+    path: ./construct-fail.yaml
+  parallel-fail:
+    path: ./parallel-fail.yaml
+  destruct-fail:
+    path: ./destruct-fail.yaml
+  cluster-marker:
+    path: ./cluster-marker.yaml

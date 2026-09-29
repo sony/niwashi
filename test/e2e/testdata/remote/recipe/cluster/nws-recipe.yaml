@@ -1,0 +1,52 @@
+version: nws.recipe/v1
+kind: cluster
+metadata:
+  id: ssh-integ-test/cluster
+  version: 1.0.0
+spec:
+  requires:
+    - name: ssh-integ-test/node-status
+      as: node_status
+
+  tasks:
+    - name: Single task
+      action:
+        exec.local:
+          scriptTpl: |
+            #!/bin/bash
+            set -eou pipefail
+            env > {{ .Outputs }}/single-env.txt
+            echo "{{ .Assets }}"
+            echo "value from Store: {{ .Store }}"
+
+      stateChanges:
+        test:
+          op: set
+          path: /store/test
+          value: "varsFromCluster"
+
+    - name: Multi task local
+      where: node.os == "linux"
+      dependsOn: ["Single task"]
+      action:
+        exec.local:
+          scriptTpl: |
+            #!/bin/bash
+            set -eou pipefail
+            env > {{ .Outputs }}/multi-env-local.txt
+            echo "{{ .Assets }}"
+            echo "value from Store: {{ .Store.test }}"
+            echo "value from node cap Store: {{ .Stores.node_status | toJson }}"
+
+    - name: Multi task remote
+      where: node.os == "linux"
+      dependsOn: ["Single task"]
+      action:
+        exec.remote:
+          scriptTpl: |
+            #!/bin/bash
+            set -eou pipefail
+            env > {{ .Outputs }}/multi-env-remote.txt
+            echo "{{ .Assets }}"
+            echo "value from Store: {{ .Store.test }}"
+            echo "value from node cap Store: {{ .Stores.node_status | toJson }}"

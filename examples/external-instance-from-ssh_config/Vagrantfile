@@ -1,0 +1,20 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  (1..2).each do |i|
+    hostname = "nws-vm-#{i-1}"
+    ip_address = "192.168.56.#{ 10 + i - 1 }"
+
+    config.vm.define hostname do |node|
+      node.vm.box = "ubuntu/jammy64"
+      node.vm.hostname = hostname
+      node.vm.network "private_network", ip: ip_address
+
+      node.vm.provider "virtualbox" do |vb|
+        vb.memory = "2048"
+        vb.cpus = "2"
+      end
+    end
+  end
+end

@@ -1,0 +1,10 @@
+version: nws.catalog/v1
+recipes:
+  prune-node:
+    path: ./prune-node.yaml
+  prune-cluster:
+    path: ./prune-cluster.yaml
+  prune-node-no-destruct:
+    path: ./prune-node-no-destruct.yaml
+  prune-cluster-no-destruct:
+    path: ./prune-cluster-no-destruct.yaml

@@ -1,0 +1,10 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: cmap-test/hash-validation
+  version: 0.0.1
+spec:
+  tasks:
+    - name: dummy task
+      action:
+        nop: {}

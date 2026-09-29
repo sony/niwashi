@@ -1,0 +1,30 @@
+{
+  "version": "nws.state/v1",
+  "inventory": {
+    "nodes": {
+      "node1": {
+        "capabilities": {
+          "test/node-capability": {
+            "version": "1.0.0"
+          }
+        }
+      }
+    },
+    "clusters": {
+      "cluster1": {
+        "capabilities": {
+          "test/cluster-capability": {
+            "version": "1.0.0"
+          }
+        }
+      }
+    }
+  },
+  "infrastructure": {
+    "generators": {
+      "vm1": {
+        "provisioner": "test/provisioner@1.0.0"
+      }
+    }
+  }
+}

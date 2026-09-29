@@ -1,0 +1,22 @@
+version: nws.recipe/v1
+kind: infra
+metadata:
+  id: examples/infra.adapter-caller
+  version: "1.0.0"
+  description: >-
+    Minimal caller — invokes the adapter's `version` command via the
+    tool.run action. (kind:infra is used here purely as the simplest way
+    to invoke an adapter; see ../infra/ for kind:infra itself.)
+spec:
+  provides:
+    - name: examples.infra.adapter-caller
+
+  requires:
+    - examples.host.tool.git
+
+  tasks:
+    - name: call-adapter
+      action:
+        tool.run:
+          toolRef: examples.adapter.tool.git
+          command: version

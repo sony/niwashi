@@ -1,0 +1,12 @@
+version: nws.recipe/v1
+kind: cluster
+metadata:
+  id: integ-test/cluster-marker
+  version: 1.0.0
+spec:
+  tasks:
+    - name: mark
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "cluster task ran" >> "{{ .Params.markerFile }}"

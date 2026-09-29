@@ -1,0 +1,12 @@
+version: nws.recipe/v1
+kind: host
+metadata:
+  id: integ-test/host1
+  version: 1.0.0
+spec:
+  tasks:
+    - name: dummy1
+      action:
+        exec.local:
+          scriptTpl: |
+            echo integ-test/host1/dymmy1

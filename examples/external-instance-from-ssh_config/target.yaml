@@ -1,0 +1,11 @@
+version: nws.state/v1
+metadata: {}
+inventory:
+  nodes:
+    node-1:
+infrastructure:
+  generators:
+    local-machine:
+      provisioner: external-instance.from=ssh_config
+      params:
+        ssh_config: "{{ .Paths.cwd }}/ssh_config"

@@ -1,0 +1,6 @@
+version: nws.catalog/v1
+recipes:
+  installer:
+    path: ./installer.yaml
+  trigger:
+    path: ./trigger.yaml

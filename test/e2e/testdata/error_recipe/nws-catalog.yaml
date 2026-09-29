@@ -1,0 +1,6 @@
+version: nws.catalog/v1
+recipes:
+  base-adapter:
+    path: ./base-adapter.yaml
+  call-unexistent-command:
+    path: ./call-unexistent-command.yaml

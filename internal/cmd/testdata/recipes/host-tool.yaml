@@ -1,0 +1,11 @@
+version: nws.recipe/v1
+kind: host
+metadata:
+  id: test/host-tool
+  version: 1.0.0
+spec:
+  tasks:
+    - name: xxx
+      action:
+        nop: {}
+

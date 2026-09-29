@@ -1,0 +1,25 @@
+version: nws.recipe/v1
+kind: infra
+metadata:
+  id: examples/infra.host-trigger
+  version: "1.0.0"
+  description: >-
+    kind:host recipes cannot be listed directly in State's capabilities — they
+    only run when pulled in via another recipe's spec.requires. This minimal
+    kind:infra recipe exists purely to trigger examples/host.git-installer and
+    report what it recorded.
+spec:
+  provides:
+    - name: examples.infra.host-trigger
+
+  requires:
+    - examples.host.tool.git
+
+  tasks:
+    - name: report
+      action:
+        exec.local:
+          scriptTpl: |
+            #!/bin/bash
+            set -euo pipefail
+            echo "git detected at {{ .Runtime.tool.examples_git.path }} (version {{ .Runtime.tool.examples_git.version }})"

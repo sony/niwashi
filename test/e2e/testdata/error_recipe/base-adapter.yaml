@@ -1,0 +1,31 @@
+version: nws.recipe/v1
+kind: adapter
+metadata:
+  id: test/node.base-adapter
+  version: 1.0.0
+spec:
+
+  commands:
+    command1:
+      task: task1
+
+    command2:
+      task: task2
+
+    command3:
+      task: unexistent_task
+
+  allowedScope: "*"
+
+  tasks:
+    - name: task1
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "This is task1"
+  
+    - name: task2
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "This is task2"

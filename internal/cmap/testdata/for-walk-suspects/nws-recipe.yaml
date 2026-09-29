@@ -1,0 +1,12 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: cmap-test/suspects-main
+  version: 0.0.1
+spec:
+  assets:
+    - config/values.yaml
+  tasks:
+    - name: dummy task
+      action:
+        nop: {}

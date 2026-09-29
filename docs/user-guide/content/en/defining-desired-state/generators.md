@@ -1,0 +1,572 @@
+---
+title: "Generators in Detail"
+weight: 8
+---
+
+# Generators in Detail
+
+This page provides a detailed explanation of all Generator (instance generator) attributes and how to use them.
+
+## What Is a Generator?
+
+A Generator is a definition for creating and managing instances (virtual machines, containers, existing servers, etc.). Each Generator must specify a `provisioner` that determines how instances are created.
+
+---
+
+## Basic Generator Definition
+
+A Generator requires an identifier (key) and at minimum a `provisioner`.
+
+```yaml
+infrastructure:
+  generators:
+    my-generator:
+      provisioner: external-instance
+```
+
+---
+
+## Generator Attributes
+
+The following attributes can be specified for a Generator.
+
+### provisioner (required)
+
+The Recipe ID specifying how instances are generated. The type of provisioner determines the nature of the instances that are created.
+
+```yaml
+infrastructure:
+  generators:
+    vm-generator:
+      provisioner: infra.vm.driver=vagrant
+```
+
+For details on how to specify the provisioner Recipe ID, see [Capabilities and Recipes in Detail]({{< relref "capabilities" >}}).
+
+#### Types of provisioners
+
+- **Built-in provisioners**: Special provisioners built into Niwashi
+- **Reference provisioners**: Reference provisioner Recipes provided by Niwashi
+- **Custom provisioners**: Provisioner Recipes created by the user
+
+---
+
+### params
+
+Specifies provisioner-specific parameters. The content of the parameters differs depending on the Provisioner Recipe used.
+
+```yaml
+infrastructure:
+  generators:
+    vagrant-vms:
+      provisioner: infra.vm.driver=vagrant
+      params:
+        count: 3
+        box: ubuntu/jammy64
+        cpus: 2
+        memory: 2048
+```
+
+#### How to Check Parameters
+
+Refer to the provisioner Recipe's documentation to find out what parameters each provisioner accepts.
+
+---
+
+## Built-in Provisioners
+
+Niwashi provides special built-in provisioners.
+
+### external-instance
+
+Used when utilizing already-running external machines or servers as instances.
+
+```yaml
+infrastructure:
+  generators:
+    existing-servers:
+      provisioner: external-instance
+      params:
+        instances:
+          server-01:
+            connection:
+              ssh:
+                address:
+                  host: 192.168.1.10
+                  port: 22
+                  user: ubuntu
+                auth:
+                  method: privateKey
+                  privateKeyPath: ~/.ssh/id_rsa
+                hostKey:
+                  knownHostsPath: ~/.ssh/known_hosts
+          server-02:
+            connection:
+              ssh:
+                address:
+                  host: 192.168.1.11
+                  port: 22
+                  user: ubuntu
+                auth:
+                  method: privateKey
+                  privateKeyPath: ~/.ssh/id_rsa
+                hostKey:
+                  knownHostsPath: ~/.ssh/known_hosts
+```
+
+#### params Structure
+
+- **instances**: Instance definitions (object)
+  - Key is the instance ID (any identifier)
+  - Value is an object containing connection information
+
+#### connection Structure
+
+- **type**: Connection type (currently only `ssh`)
+- **address**: Connection destination information
+  - **host**: Hostname or IP address
+  - **port**: Port number (default: 22)
+  - **user**: Username
+- **auth**: Authentication information
+  - **method**: Authentication method (currently only `privateKey`)
+  - **privateKeyPath**: Path to the private key
+
+#### Uses
+
+- Utilizing existing cloud instances
+- Utilizing existing in-house servers
+- Adding manually set up environments to management
+
+---
+
+## Reference Provisioners
+
+In addition to built-in provisioners, Niwashi provides reference provisioner Recipes.
+
+### Vagrant
+
+Generates virtual machines locally.
+
+```yaml
+infrastructure:
+  generators:
+    local-vms:
+      provisioner: infra.vm.driver=vagrant
+      params:
+        count: 3
+        box: ubuntu/jammy64
+        cpus: 2
+        memory: 2048
+```
+
+#### Key Parameters
+
+- **count**: Number of instances to generate
+- **box**: Vagrant box to use
+- **cpus**: Number of CPUs
+- **memory**: Memory (MB)
+- **disk_size**: Disk size (optional)
+- **network**: Network settings (optional)
+
+#### Uses
+
+- Building local development environments
+- Building test environments
+- Building demo environments
+
+For details, refer to the Vagrant Recipe documentation.
+
+---
+
+## How to Use Generators
+
+### Basic Usage
+
+1. Define a Generator
+2. Reference from Nodes (optional)
+
+```yaml
+infrastructure:
+  generators:
+    vms:
+      provisioner: infra.vm.driver=vagrant
+      params:
+        count: 3
+
+inventory:
+  nodes:
+    node1:
+      instanceSelector:
+        generator: vms  # Explicitly specify Generator
+
+    node2: {}  # Automatic selection
+    node3: {}  # Automatic selection
+```
+
+### Automatic Instance Assignment
+
+Niwashi automatically assigns instances generated by a Generator to Nodes.
+
+```
+┌─────────────────────┐
+│  Generator          │
+│  provisioner: ...   │
+│  params:            │
+│    count: 3         │
+└──────────┬──────────┘
+           │ generate
+           ↓
+┌──────────┴──────────┐
+│  Instances (3)      │
+│  - instance-1       │
+│  - instance-2       │
+│  - instance-3       │
+└──────────┬──────────┘
+           │ assign
+           ↓
+┌──────────┴──────────┐
+│  Nodes (3)          │
+│  - node1            │
+│  - node2            │
+│  - node3            │
+└─────────────────────┘
+```
+
+### Multiple Generators
+
+Multiple Generators can be defined for different purposes:
+
+```yaml
+infrastructure:
+  generators:
+    # For web servers (lower spec)
+    web-vms:
+      provisioner: infra.vm.driver=vagrant
+      params:
+        count: 2
+        box: ubuntu/jammy64
+        cpus: 1
+        memory: 1024
+
+    # For DB servers (higher spec)
+    db-vms:
+      provisioner: infra.vm.driver=vagrant
+      params:
+        count: 1
+        box: ubuntu/jammy64
+        cpus: 4
+        memory: 4096
+
+inventory:
+  nodes:
+    web-01:
+      instanceSelector:
+        generator: web-vms
+    web-02:
+      instanceSelector:
+        generator: web-vms
+    db-01:
+      instanceSelector:
+        generator: db-vms
+```
+
+---
+
+## Practical Generator Definition Examples
+
+### Local Development Environment
+
+```yaml
+infrastructure:
+  generators:
+    local-vms:
+      provisioner: infra.vm.driver=vagrant
+      params:
+        count: 3
+        box: ubuntu/jammy64
+        cpus: 2
+        memory: 2048
+        network:
+          type: private_network
+          ip_prefix: 192.168.56
+```
+
+### Managing Existing Servers
+
+```yaml
+infrastructure:
+  generators:
+    prod-servers:
+      provisioner: external-instance
+      params:
+        instances:
+          web-prod:
+            connection:
+              ssh:
+                address:
+                  host: web.example.com
+                  port: 22
+                  user: deploy
+                auth:
+                  method: privateKey
+                  privateKeyPath: ~/.ssh/deploy_key
+                hostKey:
+                  knownHostsPath: ~/.ssh/known_hosts
+
+          db-prod:
+            connection:
+              ssh:
+                address:
+                  host: db.example.com
+                  port: 22
+                  user: deploy
+                auth:
+                  method: privateKey
+                  privateKeyPath: ~/.ssh/deploy_key
+                hostKey:
+                  knownHostsPath: ~/.ssh/known_hosts
+```
+
+### Mixed Environment
+
+Using different provisioners for development and production:
+
+#### base.yaml (common logical configuration)
+
+```yaml
+version: nws.state/v1
+
+inventory:
+  nodes:
+    web:
+      capabilities:
+        - web.nginx
+    db:
+      capabilities:
+        - database.postgresql
+```
+
+#### infra-dev.yaml (development environment)
+
+```yaml
+version: nws.state/v1
+
+infrastructure:
+  generators:
+    local-vms:
+      provisioner: infra.vm.driver=vagrant
+      params:
+        count: 2
+        box: ubuntu/jammy64
+```
+
+#### infra-prod.yaml (production environment)
+
+```yaml
+version: nws.state/v1
+
+infrastructure:
+  generators:
+    prod-servers:
+      provisioner: external-instance
+      params:
+        instances:
+          web-prod:
+            connection:
+              ssh:
+                address:
+                  host: web.example.com
+                  port: 22
+                  user: deploy
+          db-prod:
+            connection:
+              ssh:
+                address:
+                  host: db.example.com
+                  port: 22
+                  user: deploy
+```
+
+#### Switching Between Them
+
+```bash
+# Development environment
+nwsctl plan -t base.yaml -t infra-dev.yaml
+
+# Production environment
+nwsctl plan -t base.yaml -t infra-prod.yaml
+```
+
+### Using Templates
+
+```yaml
+template:
+  instance:
+    standard-vm:
+      provisioner: infra.vm.driver=vagrant
+      params:
+        box: ubuntu/jammy64
+        cpus: 2
+        memory: 2048
+
+infrastructure:
+  generators:
+    web-vms:
+      templates: [standard-vm]
+      params:
+        count: 2
+
+    db-vms:
+      templates: [standard-vm]
+      params:
+        count: 1
+        memory: 4096  # Override memory only
+```
+
+---
+
+## Common Patterns
+
+### Pattern 1: Uniform VM Pool
+
+Generate VMs all with the same spec:
+
+```yaml
+infrastructure:
+  generators:
+    vms:
+      provisioner: infra.vm.driver=vagrant
+      params:
+        count: 5
+        box: ubuntu/jammy64
+        cpus: 2
+        memory: 2048
+```
+
+### Pattern 2: Role-Based VM Pools
+
+Generate VMs with different specs by role:
+
+```yaml
+infrastructure:
+  generators:
+    control-plane-vm:
+      provisioner: infra.vm.driver=vagrant
+      params:
+        count: 1
+        box: ubuntu/jammy64
+        cpus: 4
+        memory: 4096
+
+    worker-vms:
+      provisioner: infra.vm.driver=vagrant
+      params:
+        count: 3
+        box: ubuntu/jammy64
+        cpus: 2
+        memory: 2048
+```
+
+### Pattern 3: Mixing Existing Servers and VMs
+
+```yaml
+infrastructure:
+  generators:
+    # Existing production servers
+    prod-servers:
+      provisioner: external-instance
+      params:
+        instances:
+          prod-db:
+            connection:
+              ssh:
+                address:
+                  host: db.prod.example.com
+                  port: 22
+                  user: deploy
+
+    # VMs for development
+    dev-vms:
+      provisioner: infra.vm.driver=vagrant
+      params:
+        count: 2
+        box: ubuntu/jammy64
+```
+
+---
+
+## Troubleshooting
+
+### Instances Not Generated
+
+**Problem**: A Generator is defined but instances are not generated.
+
+**Causes**:
+- The provisioner Recipe ID is incorrect
+- Required parameters are missing
+- The provisioner is not correctly installed
+
+**Solutions**:
+1. Verify the provisioner Recipe ID
+2. Check the provisioner documentation for required parameters
+3. Verify that the Recipe is correctly installed
+
+### Not Enough Instances
+
+**Problem**: There are not enough instances relative to the number of Nodes, causing assignment failure.
+
+**Causes**:
+- `params.count` is insufficient
+- Multiple Generators are used but the total count is not enough
+
+**Solutions**:
+1. Increase `params.count`
+2. Verify the number of Nodes against the number of instances being generated
+
+```yaml
+# Bad: 2 instances for 3 Nodes
+infrastructure:
+  generators:
+    vms:
+      provisioner: infra.vm.driver=vagrant
+      params:
+        count: 2  # Insufficient
+
+inventory:
+  nodes:
+    node1: {}
+    node2: {}
+    node3: {}  # Cannot be assigned
+
+# Good: 3 instances for 3 Nodes
+infrastructure:
+  generators:
+    vms:
+      provisioner: infra.vm.driver=vagrant
+      params:
+        count: 3  # OK
+```
+
+### Cannot Connect (external-instance)
+
+**Problem**: An existing server was specified with external-instance but cannot connect.
+
+**Causes**:
+- Hostname/IP address is incorrect
+- Port number is incorrect
+- Private key path is incorrect
+- Private key permissions are inappropriate
+
+**Solutions**:
+1. Verify the connection information
+2. Try connecting manually via SSH
+3. Check private key permissions (`chmod 600`)
+
+---
+
+## Next Steps
+
+- [Nodes in Detail]({{< relref "nodes" >}}) - All Node attributes and instance assignment
+- [Capabilities and Recipes in Detail]({{< relref "capabilities" >}}) - How to specify provisioners
+- [Templates in Detail]({{< relref "templates" >}}) - Using templates for Generators
+- [Managing Multiple Environments]({{< relref "advanced/multi-environment" >}}) - Switching infrastructure per environment

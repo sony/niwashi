@@ -1,0 +1,54 @@
+version: nws.state/v1
+metadata: {}
+
+infrastructure:
+  generators:
+    local-machines:
+      provisioner: external-instance
+      params:
+        instances:
+          cp-1:
+            connection:
+              ssh:
+                address:
+                  host: 127.0.0.1
+                  port: 2222
+                  user: nwsuser
+                auth:
+                  privateKeyPath: ./id_ed25519
+                hostKey:
+                  knownHostsPath: ./known_hosts
+          worker-1:
+            connection:
+              ssh:
+                address:
+                  host: 127.0.0.1
+                  port: 2223
+                  user: nwsuser
+                auth:
+                  privateKeyPath: ./id_ed25519
+                hostKey:
+                  knownHostsPath: ./known_hosts
+
+inventory:
+  nodes:
+    cp:
+      instanceSelector:
+        generator: local-machines
+        instance: cp-1
+    worker1:
+      instanceSelector:
+        generator: local-machines
+        instance: worker-1
+
+  clusters:
+    demo-cluster:
+      nodes:
+        cp:
+          labels:
+            role: master
+        worker1:
+          labels:
+            role: worker
+      capabilities:
+        - examples.cluster.hello

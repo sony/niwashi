@@ -1,0 +1,5 @@
+version: nws.profile/v1
+name: dev
+capabilityBinding:
+#  orchestrator.kubernetes: orchestrator.kubernetes.by=testbed
+  orchestrator.kubernetes: orchestrator.kubernetes.by=kubespray

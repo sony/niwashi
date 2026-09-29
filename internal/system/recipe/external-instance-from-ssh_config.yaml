@@ -1,0 +1,117 @@
+version: nws.recipe/v1
+kind: infra
+metadata:
+  id: nws/external-instance-ssh_config
+  version: 1.0.0
+spec:
+  category: provision
+  provides:
+    - name: external-instance
+      attrs: { from: ssh_config }
+
+  defaults:
+    params:
+      ssh_config: ""
+
+  tasks:
+    - name: provision
+      operation: construct
+      action:
+        exec.local:
+          scriptTpl: |
+            #!/usr/bin/env bash
+            set -euo pipefail
+
+            KNOWN_HOSTS="{{ .Outputs.known_hosts }}"
+
+            # Parse ssh_config from stdin into parallel arrays
+            declare -a HOSTS=()
+            declare -A HOST_NAME=()
+            declare -A HOST_PORT=()
+            declare -A HOST_USER=()
+            declare -A HOST_KEY=()
+
+            current=""
+            while IFS= read -r line; do
+                # Trim leading whitespace
+                line="${line#"${line%%[! ]*}"}"
+
+                case "$line" in
+                    Host\ *)
+                        current="${line#Host }"
+                        HOSTS+=("$current")
+                        HOST_PORT["$current"]="22"  # default
+                        ;;
+                    HostName\ *)
+                        HOST_NAME["$current"]="${line#HostName }"
+                        ;;
+                    Port\ *)
+                        HOST_PORT["$current"]="${line#Port }"
+                        ;;
+                    User\ *)
+                        HOST_USER["$current"]="${line#User }"
+                        ;;
+                    IdentityFile\ *)
+                        HOST_KEY["$current"]="${line#IdentityFile }"
+                        ;;
+                esac
+            done < "{{ .Params.ssh_config | render }}"
+
+            if [ ${#HOSTS[@]} -eq 0 ]; then
+                echo "Error: no Host entries found in input" >&2
+                exit 1
+            fi
+
+            # Run ssh-keyscan for all hosts and write to known_hosts
+            {
+                for host in "${HOSTS[@]}"; do
+                    name="${HOST_NAME[$host]:-$host}"
+                    port="${HOST_PORT[$host]}"
+                    if [ "$port" != "22" ]; then
+                        ssh-keyscan -p "$port" "$name" 2>/dev/null || true
+                    else
+                        ssh-keyscan "$name" 2>/dev/null || true
+                    fi
+                done
+            } > "$KNOWN_HOSTS"
+            echo "Written host keys to $KNOWN_HOSTS" >&2
+
+            # Emit YAML
+            for host in "${HOSTS[@]}"; do
+                name="${HOST_NAME[$host]:-$host}"
+                port="${HOST_PORT[$host]}"
+                user="${HOST_USER[$host]:-}"
+                key="${HOST_KEY[$host]:-}"
+
+                # Use the Host alias as instance name, sanitized
+                instance_name="${host}"
+                cat <<EOF >> {{ .Outputs }}/instances.yaml
+            ${instance_name}:
+              connection:
+                ssh:
+                  address:
+                    host: ${name}
+                    port: ${port}
+                    user: ${user}
+                  auth:
+                    privateKeyPath: ${key}
+                  hostKey:
+                    knownHostsPath: ${KNOWN_HOSTS}
+            EOF
+            done
+
+      stateChanges:
+        generate-instances:
+          op: set
+          path: /instances
+          valueFromFile: "{{ .Outputs }}/instances.yaml"
+
+    - name: teardown
+      operation: destruct
+      action:
+        exec.local:
+          scriptTpl: ""
+      stateChanges:
+        remove-instance-from-state:
+          op: remove
+          path: /instances

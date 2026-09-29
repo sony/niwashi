@@ -1,0 +1,18 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: integ-test/prune-node
+  version: 1.0.0
+spec:
+  tasks:
+    - name: construct
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "construct prune-node"
+    - name: destruct
+      operation: destruct
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "destruct prune-node"

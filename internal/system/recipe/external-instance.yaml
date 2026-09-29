@@ -1,0 +1,35 @@
+version: nws.recipe/v1
+kind: infra
+metadata:
+  id: nws/external-instance
+  version: 1.0.0
+spec:
+  category: provision
+  provides:
+    - name: external-instance
+
+  defaults:
+    params:
+      instances: {}
+
+  tasks:
+    - name: provision
+      operation: construct
+      action:
+        exec.local:
+          scriptTpl: ""
+      stateChanges:
+        generate-instances:
+          op: set
+          path: /instances
+          valueFromJson: "{{ .Params.instances | toJson }}"
+
+    - name: teardown
+      operation: destruct
+      action:
+        exec.local:
+          scriptTpl: ""
+      stateChanges:
+        remove-instance-from-state:
+          op: remove
+          path: /instances

@@ -1,0 +1,47 @@
+- ユーザーガイド
+  - はじめに
+    - Niwashiでできること
+    - ワークフロー
+    - アーキテクチャ
+  - 目標の状態を定義する
+    - 状態の概要
+    - ノードのCapability
+    - クラスタのCapability
+    - インフラストラクチャ
+    - テンプレート
+  - レシピを利用する
+    - 公式のレシピ
+  - 計画の実行
+    - 現在の状態を定義する
+    - 計画を立てる
+    - 計画を実行する
+  - レシピを定義する
+    - Node Capability
+    - Cluster Capability
+    - Host Configuration
+    - Infrastructure Provisioning
+    - アダプタを定義する
+  - サンプル
+    - 仮想マシンを立ち上げる
+    - 外部のマシンをセットアップする
+    - 独自のレシピを作成する
+    - アダプタを使う
+    - 仮想マシンでKubernetesクラスタを構築する
+  - フォーマット
+    - State
+    - Profile
+    - Recipe
+    - Catalog
+  - CLIマニュアル
+    - init
+    - plan
+    - apply
+    - export
+    - ssh
+    - help
+    - completion
+    - version
+  - レシピ
+    - Ansible
+    - Kubernetes
+    - Vagrant

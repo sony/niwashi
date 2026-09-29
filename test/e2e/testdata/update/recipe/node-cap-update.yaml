@@ -1,0 +1,36 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: integ-test/update-cap
+  version: 1.0.0
+spec:
+  defaults:
+    params:
+      memory: "1024"
+  tasks:
+    - name: construct
+      operation: construct
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "construct memory={{ .Params.memory }}" >> "{{ .Params.markerFile }}"
+      stateChanges:
+        mark:
+          op: set
+          path: "store/last_operation"
+          value: "construct"
+        keep:
+          op: set
+          path: "store/from_construct"
+          value: "kept"
+    - name: update
+      operation: update
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "update memory={{ .Params.memory }}" >> "{{ .Params.markerFile }}"
+      stateChanges:
+        mark:
+          op: set
+          path: "store/last_operation"
+          value: "update"

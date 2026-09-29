@@ -1,0 +1,24 @@
+version: nws.catalog/v1
+recipes:
+  host1:
+    path: ./host1.yaml
+  host2:
+    path: ./host2.yaml
+  adapter1:
+    path: ./adapter1.yaml
+  adapter2:
+    path: ./adapter2.yaml
+  infra1:
+    path: ./infra1.yaml
+  infra2:
+    path: ./infra2.yaml
+  node-cap1:
+    path: ./node-cap1.yaml
+  node-cap2:
+    path: ./node-cap2.yaml
+  node-cap3:
+    path: ./node-cap3.yaml
+  cluster-cap1:
+    path: ./cluster-cap1.yaml
+  cluster-cap2:
+    path: ./cluster-cap2.yaml

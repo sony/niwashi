@@ -1,0 +1,30 @@
+version: nws.state/v1
+metadata: {}
+inventory:
+  nodes:
+    cp:
+    worker1:
+    worker2:
+  clusters:
+    k8s-cluster:
+      capabilities:
+        - orchestrator.kubernetes
+      nodes:
+        - cp
+        - worker1
+        - worker2
+      params:
+        groups:
+          kube_control_plane: [ cp ]
+          kube_node: [ worker1, worker2 ]
+          etcd: [ cp ]
+
+infrastructure:
+  generators:
+    vm:
+      provisioner: infra.vm.driver=vagrant
+      params:
+        count: 3
+        box: ubuntu/jammy64
+        cpus: 2
+        memory: 2048

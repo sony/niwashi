@@ -1,0 +1,43 @@
+version: nws.state/v1
+metadata: {}
+inventory:
+  nodes:
+    node-1:
+      capabilities:
+      - integ-test/node-cap1
+      - integ-test/node-cap3
+      instanceSelector:
+        generator: dummy-2
+    node-2:
+      capabilities:
+      - integ-test/node-cap2
+      - integ-test/node-cap3
+    node-3:
+      instanceSelector:
+        generator: dummy-1
+      capabilities:
+      - integ-test/node-cap1
+      - integ-test/node-cap2
+      - integ-test/node-cap3
+  clusters:
+    cluster-1:
+      nodes: [node-1]
+      capabilities:
+      - integ-test/cluster-cap1
+    cluster-2:
+      nodes: [node-2, node-3]
+      capabilities:
+      - integ-test/cluster-cap2
+    cluster-3:
+      nodes: [node-1, node-2, node-3]
+      capabilities:
+      - integ-test/cluster-cap1
+      - integ-test/cluster-cap2
+
+
+infrastructure:
+  generators:
+    dummy-1:
+      provisioner: integ-test/infra1
+    dummy-2:
+      provisioner: integ-test/infra2

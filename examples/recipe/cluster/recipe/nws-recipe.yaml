@@ -1,0 +1,53 @@
+version: nws.recipe/v1
+kind: cluster
+metadata:
+  id: examples/cluster.hello
+  version: "1.0.0"
+  description: >-
+    Minimal cluster capability sample demonstrating the `where` pattern:
+    a common step run on every member node (matched via `where` against
+    both role labels), then role-specific steps dispatched by label, then
+    a centralized cluster-level step.
+spec:
+  provides:
+    - name: examples.cluster.hello
+
+  tasks:
+    - name: prepare
+      where: "node.labels.role in ['master', 'worker']"
+      action:
+        exec.remote:
+          scriptTpl: |
+            #!/bin/bash
+            set -euo pipefail
+            mkdir -p /tmp/niwashi-cluster-hello
+            echo "prepared: $NWS_TARGET_ID" > /tmp/niwashi-cluster-hello/prepare.txt
+
+    - name: init-master
+      where: "node.labels.role == 'master'"
+      dependsOn: [prepare]
+      action:
+        exec.remote:
+          scriptTpl: |
+            #!/bin/bash
+            set -euo pipefail
+            echo "master initialized: $NWS_TARGET_ID" > /tmp/niwashi-cluster-hello/master.txt
+
+    - name: join-workers
+      where: "node.labels.role == 'worker'"
+      dependsOn: [init-master]
+      action:
+        exec.remote:
+          scriptTpl: |
+            #!/bin/bash
+            set -euo pipefail
+            echo "worker joined: $NWS_TARGET_ID" > /tmp/niwashi-cluster-hello/worker.txt
+
+    - name: verify
+      dependsOn: [init-master, join-workers]
+      action:
+        exec.local:
+          scriptTpl: |
+            #!/bin/bash
+            set -euo pipefail
+            echo "Cluster {{ .Target }} setup completed"

@@ -1,0 +1,42 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: integ-test/node-cap1
+  version: 1.0.0
+spec:
+  requires:
+    - integ-test/host1
+  tasks:
+    - name: dummy4
+      dependsOn: [dummy2, dummy3]
+      action:
+        exec.local:
+          scriptTpl: |
+            echo integ-test/node-cap1/dymmy4
+            sleep 1
+    - name: dummy3
+      dependsOn: [dummy1]
+      action:
+        exec.local:
+          scriptTpl: |
+            echo integ-test/node-cap1/dymmy3
+            sleep 1
+    - name: dummy2
+      dependsOn: [dummy1]
+      action:
+        exec.local:
+          scriptTpl: |
+            echo integ-test/node-cap1/dymmy2
+            sleep 2
+    - name: dummy1
+      action:
+        exec.local:
+          scriptTpl: |
+            echo integ-test/node-cap1/dymmy1
+            sleep 2
+    - name: dummyX
+      dependsOn: [dummy4]
+      action:
+        tool.run:
+          toolRef: integ-test/adapter1
+          command: dummy1

@@ -1,0 +1,19 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: integ-test/update-cap-bad-toolrun
+  version: 1.0.0
+spec:
+  tasks:
+    - name: construct
+      operation: construct
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "construct memory={{ .Params.memory }}"
+    - name: update
+      operation: update
+      action:
+        tool.run:
+          toolRef: integ-test/update-adapter
+          command: no-such-command

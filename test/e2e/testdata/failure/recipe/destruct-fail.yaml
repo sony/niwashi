@@ -1,0 +1,19 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: integ-test/destruct-fail
+  version: 1.0.0
+spec:
+  tasks:
+    - name: construct
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "construct"
+    - name: destruct
+      operation: destruct
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "destruct fails on purpose"
+            exit 1

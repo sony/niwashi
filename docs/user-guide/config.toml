@@ -1,0 +1,57 @@
+baseURL = "https://example.com/"  # change to public url
+title = "Niwashi"
+theme = "hugo-book"
+
+# Default language
+defaultContentLanguage = "en"
+defaultContentLanguageInSubdir = false
+
+# content dir
+contentDir = "content"
+
+# url
+relativeURLs = true
+
+# markdown configuration
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
+  [markup.highlight]
+    style = "monokai"
+    lineNos = true
+    lineNumbersInTable = true
+
+# multi-language
+[languages]
+  [languages.ja]
+    contentDir = "content/ja"
+    label = "日本語"
+    locale = "ja"
+    weight = 1
+    title = "Niwashi ユーザーガイド"
+
+    [languages.ja.params]
+      BookRepo = "https://github.com/sony/niwashi"
+      BookEditPath = "edit/main/docs/user-guide/content/ja"
+      BookSearch = true
+      BookToC = true
+
+  [languages.en]
+    contentDir = "content/en"
+    label = "English"
+    locale = "en"
+    weight = 2
+    title = "Niwashi User Guide"
+
+    [languages.en.params]
+      BookRepo = "https://github.com/sony/niwashi"
+      BookEditPath = "edit/main/docs/user-guide/content/en"
+      BookSearch = true
+      BookToC = true
+
+# global params
+[params]
+  BookRepo = "https://github.com/sony/niwashi"
+  BookSearch = true
+  BookToC = true

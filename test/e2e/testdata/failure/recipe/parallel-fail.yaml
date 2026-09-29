@@ -1,0 +1,26 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: integ-test/parallel-fail
+  version: 1.0.0
+spec:
+  # Three independent tasks: one fails immediately while the others are still
+  # pending or running, so the failure path must wait for the remaining work
+  # and still reach the failure hooks.
+  tasks:
+    - name: fail-fast
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "fails on purpose"
+            exit 1
+    - name: slow-1
+      action:
+        exec.local:
+          scriptTpl: |
+            sleep 1
+    - name: slow-2
+      action:
+        exec.local:
+          scriptTpl: |
+            sleep 1

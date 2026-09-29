@@ -1,0 +1,34 @@
+version: nws.recipe/v1
+kind: infra
+metadata:
+  id: integ-test/infra2
+  version: 1.0.0
+spec:
+  tasks:
+    - name: dummy1
+      action:
+        exec.local:
+          scriptTpl: |
+            echo integ-test/infra2/dymmy1
+            cat <<EOF > {{ .Outputs }}/instance.json
+            {
+              "instance-1": {},
+              "instance-2": {}
+            }
+            EOF
+            sleep 1
+      stateChanges:
+        generate:
+          op: set
+          path: "/instances"
+          valueFromFile: "{{ .Outputs }}/instance.json"
+    - name: destruct dummy1
+      operation: destruct
+      action:
+        exec.local:
+          scriptTpl: |
+            echo integ-test/infra2/destruct-dummy1
+      stateChanges:
+        remove-instance-from-state:
+          op: remove
+          path: "/instances"

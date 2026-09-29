@@ -1,0 +1,16 @@
+version: nws.recipe/v1
+kind: adapter
+metadata:
+  id: integ-test/adapter1
+  version: 1.0.0
+spec:
+  allowedScope: node
+  commands:
+    dummy1:
+      task: dummy1
+  tasks:
+    - name: dummy1
+      action:
+        exec.local:
+          scriptTpl: |
+            echo integ-test/adapter1/dymmy1

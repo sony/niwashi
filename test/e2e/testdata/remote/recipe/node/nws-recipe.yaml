@@ -1,0 +1,61 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: ssh-integ-test/node-status
+  version: 1.0.0
+spec:
+  tasks:
+    - name: Save env vars
+      action:
+        exec.remote:
+          scriptTpl: |
+            env > {{ .Outputs.env }}
+      stateChanges:
+        test:
+          op: set
+          path: /store/test
+          value: "varsFromNode"
+
+    - name: check envfile
+      dependsOn: ["Save env vars"]
+      action:
+        exec.local:
+          scriptTpl: |
+            #!/bin/bash
+            set -eou pipefail
+            ls -l {{ .Outputs.env }} > {{ .Outputs }}/checked.txt
+
+            echo "{{ .Assets }}"
+            echo "value from Store: {{ .Store.test }}"
+            echo "value from Store: {{ .Store.missing_key | default "" }}"
+
+    - name: final check
+      dependsOn: ["check envfile"]
+      action:
+        exec.remote:
+          scriptTpl: |
+            #!/bin/bash
+            set -eou pipefail
+            ls -l {{ .Outputs }}/checked.txt
+            echo "{{ .Assets }}"
+            echo "value from Store: {{ .Store.test }}"
+
+    - name: linux-specific
+      where: node.os == "linux"
+      action:
+        exec.remote:
+          scriptTpl: |
+            #!/bin/bash
+            set -eou pipefail
+            echo "This is a Linux node" > {{ .Outputs }}/linux.txt
+            echo "{{ .Assets }}"
+
+    - name: windows-specific
+      where: node.os == "windows"
+      action:
+        exec.remote:
+          scriptTpl: |
+            #!/usr/bin/env pwsh
+
+            echo "This is a Windows node" > {{ .Outputs }}/windows.txt
+            echo "{{ .Assets }}"

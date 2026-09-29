@@ -1,0 +1,16 @@
+version: nws.recipe/v1
+kind: adapter
+metadata:
+  id: integ-test/update-adapter
+  version: 1.0.0
+spec:
+  allowedScope: "*"
+  commands:
+    reconfigure:
+      task: reconfigure
+  tasks:
+    - name: reconfigure
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "integ-test/update-adapter/reconfigure"

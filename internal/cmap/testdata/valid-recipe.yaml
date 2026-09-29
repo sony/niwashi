@@ -1,0 +1,12 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: test/test-recipe
+  version: 1.0.0
+spec:
+  assets:
+    - assets/asset1.txt
+  tasks:
+    - name: task1
+      action:
+        nop: {}

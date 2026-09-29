@@ -1,0 +1,30 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: examples/node.hello
+  version: "1.0.0"
+  description: >-
+    Minimal node capability sample. Connects to the target node over SSH
+    (exec.remote), writes a greeting file, and removes it on destroy.
+spec:
+  provides:
+    - name: examples.node.hello
+
+  tasks:
+    - name: greet
+      action:
+        exec.remote:
+          scriptTpl: |
+            #!/bin/bash
+            set -euo pipefail
+            echo "Hello, Niwashi! (node: {{ .Target }})" > /tmp/niwashi-node-hello.txt
+            cat /tmp/niwashi-node-hello.txt
+
+    - name: cleanup
+      operation: destruct
+      action:
+        exec.remote:
+          scriptTpl: |
+            #!/bin/bash
+            set -euo pipefail
+            rm -f /tmp/niwashi-node-hello.txt

@@ -1,0 +1,26 @@
+version: nws.state/v1
+metadata: {}
+inventory:
+  nodes:
+    win-1:
+      capabilities:
+        - examples/windows.hello
+
+infrastructure:
+  generators:
+    existing-servers:
+      provisioner: external-instance
+      params:
+        instances:
+          win-1:
+            connection:
+              winrm:
+                address:
+                  host: 192.0.2.10
+                  user: Administrator
+                auth:
+                  method: ntlm
+                  passwordRef:
+                    fromEnv: WINDOWS_ADMIN_PASSWORD
+                serverCert:
+                  insecureSkipVerify: true

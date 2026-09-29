@@ -1,0 +1,20 @@
+version: nws.state/v1
+metadata: {}
+inventory:
+  nodes:
+    node-1:
+      capabilities:
+        - ssh-integ-test/node-status
+  clusters:
+    cluster-1:
+      nodes:
+        - node-1
+      capabilities:
+        - ssh-integ-test/cluster
+
+infrastructure:
+  generators:
+    dummy-1:
+      provisioner: external-instance.from=file
+      params:
+        path: instances.yaml

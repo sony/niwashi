@@ -1,0 +1,8 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: test/node-capability
+  version: 1.0.0
+spec:
+  requires:
+    - test/host-tool@1.0.0

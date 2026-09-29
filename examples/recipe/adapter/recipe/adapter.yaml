@@ -1,0 +1,33 @@
+version: nws.recipe/v1
+kind: adapter
+metadata:
+  id: examples/adapter.git
+  version: "1.0.0"
+  description: >-
+    Minimal adapter sample. Wraps `git` (detected by the paired installer
+    recipe) and exposes a `version` command that other recipes can invoke
+    via the tool.run action.
+spec:
+  provides:
+    - name: examples.adapter.tool.git
+
+  allowedScope: infra
+
+  requires:
+    - examples.host.tool.git
+
+  commands:
+    default:
+      task: run
+    version:
+      task: run
+      description: "Print the git version detected by the installer"
+
+  tasks:
+    - name: run
+      action:
+        exec.local:
+          scriptTpl: |
+            #!/bin/bash
+            set -euo pipefail
+            exec {{ .Runtime.tool.examples_git.path }} --version

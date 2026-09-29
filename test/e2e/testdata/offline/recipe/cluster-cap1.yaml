@@ -1,0 +1,21 @@
+version: nws.recipe/v1
+kind: cluster
+metadata:
+  id: integ-test/cluster-cap1
+  version: 1.0.0
+spec:
+  requires:
+    - integ-test/node-cap2
+    - integ-test/host2
+  tasks:
+    - name: dummy2
+      dependsOn: [dummy1]
+      action:
+        exec.local:
+          scriptTpl: |
+            echo integ-test/cluster-cap1/dymmy2
+    - name: dummy1
+      action:
+        exec.local:
+          scriptTpl: |
+            echo integ-test/cluster-cap1/dymmy1

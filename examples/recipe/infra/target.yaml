@@ -1,0 +1,10 @@
+version: nws.state/v1
+metadata: {}
+
+infrastructure:
+  generators:
+    demo-vms:
+      provisioner: examples/infra.dummy-vms
+      params:
+        count: 2
+        prefix: dummy-vm

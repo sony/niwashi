@@ -1,0 +1,4 @@
+version: nws.catalog/v1
+recipes:
+  zzz:
+    path: ./zzz-recipe.yaml

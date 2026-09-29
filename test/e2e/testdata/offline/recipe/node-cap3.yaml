@@ -1,0 +1,13 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: integ-test/node-cap3
+  version: 1.0.0
+spec:
+  tasks:
+    - name: dummy1
+      action:
+        exec.local:
+          scriptTpl: |
+            echo integ-test/node-cap3/dymmy1
+            sleep 3

@@ -1,0 +1,10 @@
+version: nws.catalog/v1
+recipes:
+  provisioner:
+    path: ./provisioner.yaml
+  host-tool:
+    path: ./host-tool.yaml
+  node-cap:
+    path: ./node-cap.yaml
+  cluster-cap:
+    path: ./cluster-cap.yaml

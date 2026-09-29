@@ -1,0 +1,10 @@
+version: nws.recipe/v1
+kind: cluster
+metadata:
+  id: test/cluster-capability
+  version: 1.0.0
+spec:
+  tasks:
+    - name: xxx
+      action:
+        nop: {}

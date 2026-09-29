@@ -1,0 +1,13 @@
+version: nws.recipe/v1
+kind: cluster
+metadata:
+  id: integ-test/prune-cluster-no-destruct
+  version: 1.0.0
+spec:
+  # No operation: destruct task: pruning must still remove it from state.
+  tasks:
+    - name: construct
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "construct prune-cluster-no-destruct"

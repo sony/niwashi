@@ -1,0 +1,7 @@
+version: nws.state/v1
+metadata: {}
+
+infrastructure:
+  generators:
+    trigger:
+      provisioner: examples/infra.adapter-caller

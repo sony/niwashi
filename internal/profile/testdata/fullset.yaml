@@ -1,0 +1,16 @@
+version: nws.profile/v1
+name: test
+toolAlias:
+  tool1: alias1
+capabilityBinding:
+  cap1: binding1
+params:
+  cluster:
+    cluster1:
+      key1: value1
+      key2:
+        key2-1: value2-1
+        key2-2: value2-2
+  capability:
+    cap1:
+      key2: value2

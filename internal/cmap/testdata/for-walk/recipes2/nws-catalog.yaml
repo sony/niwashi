@@ -1,0 +1,10 @@
+version: nws.catalog/v1
+recipes:
+  adapter:
+    path: ./sub/sub1.yaml
+  tool:
+    path: ./sub/sub2.yaml
+  xyz_v1:
+    path: ./xyz-v1.yaml
+  xyz_v2:
+    path: ./xyz-v2.yaml

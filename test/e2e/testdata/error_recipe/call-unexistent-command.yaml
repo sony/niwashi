@@ -1,0 +1,14 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: test/node.call-unexistent-command
+  version: 1.0.0
+
+spec:
+
+  tasks:
+    - name: call-unexistent-adapter
+      action:
+        tool.run:
+          toolRef: test/node.base-adapter
+          command: unexistent_command # no command found

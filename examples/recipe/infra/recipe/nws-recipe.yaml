@@ -1,0 +1,68 @@
+version: nws.recipe/v1
+kind: infra
+metadata:
+  id: examples/infra.dummy-vms
+  version: "1.0.0"
+  description: >-
+    Minimal infra provisioner sample. Fabricates instance records instead of
+    provisioning real infrastructure, to isolate the kind:infra mechanics
+    (count-based provisioning, stateChanges) from any external dependency.
+spec:
+  provides:
+    - name: examples.infra.dummy-vms
+
+  workspace:
+    mode: persistent
+
+  defaults:
+    params:
+      count: 2
+      prefix: "dummy-vm"
+
+  tasks:
+    - name: provision
+      action:
+        exec.local:
+          scriptTpl: |
+            #!/bin/bash
+            set -euo pipefail
+            mkdir -p "{{ .Outputs.instances }}"
+
+            for i in $(seq 0 $(( {{ .Params.count }} - 1 ))); do
+              VM_NAME="{{ .Params.prefix }}-${i}"
+              # A real provisioner would call `docker run`, `vagrant up`, a cloud
+              # API, etc. here and obtain real connection info. This sample
+              # fabricates it instead, so it stays runnable with no external
+              # dependency (see the node/ and cluster/ samples for a real,
+              # reachable target reached over SSH).
+              jq -n --arg host "127.0.0.1" --arg user "nobody" --arg key "/dev/null" --arg hk "/dev/null" \
+                '{
+                  connection: {
+                    ssh: {
+                      address: { host: $host, port: 22, user: $user },
+                      auth: { method: "privateKey", privateKeyPath: $key },
+                      hostKey: { knownHostsPath: $hk }
+                    }
+                  },
+                  addresses: [$host]
+                }' > "{{ .Outputs.instances }}/${VM_NAME}.json"
+            done
+      stateChanges:
+        register:
+          count: "{{ .Params.count }}"
+          op: set
+          path: "instances/{{ .Params.prefix }}-{{ .Loop.index }}"
+          valueFromFile: "{{ .Outputs.instances }}/{{ .Params.prefix }}-{{ .Loop.index }}.json"
+
+    - name: teardown
+      operation: destruct
+      action:
+        exec.local:
+          scriptTpl: |
+            #!/bin/bash
+            set -euo pipefail
+            echo "tearing down dummy instances for generator {{ .Target }}"
+      stateChanges:
+        remove:
+          op: remove
+          path: "instances"

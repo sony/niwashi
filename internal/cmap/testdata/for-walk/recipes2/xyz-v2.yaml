@@ -1,0 +1,10 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: cmap-test/xyz
+  version: 2.0.0
+spec:
+  tasks:
+    - name: dummy task
+      action:
+        nop: {}

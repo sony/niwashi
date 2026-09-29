@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Niwashi Plan Profile v1",
+  "description": "Schema for the nws.profile/v1 YAML file, used with 'nwsctl plan --profile'.",
+  "type": "object",
+  "required": [
+    "version",
+    "name"
+  ],
+  "properties": {
+    "version": {
+      "description": "The schema version for the profile file.",
+      "type": "string",
+      "const": "nws.profile/v1"
+    },
+    "name": {
+      "description": "A unique name for the profile.",
+      "type": "string"
+    },
+    "toolAlias": {
+      "description": "Defines short aliases for tools.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[^/]+/[^@]+@[^@]+$"
+      }
+    },
+    "capabilityBinding": {
+      "description": "Specifies the FQID of a recipe to use for a given capability to resolve ambiguity.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[^/]+/[^@]+@[^@]+$"
+      }
+    },
+    "params": {
+      "description": "Parameters to be merged into the target state.",
+      "type": "object",
+      "properties": {
+        "cluster": {
+          "description": "Parameters applied to a specific cluster, keyed by the cluster ID.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object"
+          }
+        },
+        "capability": {
+          "description": "Parameters applied to all resources that have the specified capability.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

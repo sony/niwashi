@@ -1,0 +1,8 @@
+version: nws.catalog/v1
+recipes:
+  installer:
+    path: ./installer.yaml
+  adapter:
+    path: ./adapter.yaml
+  caller:
+    path: ./caller.yaml

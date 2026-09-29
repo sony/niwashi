@@ -1,0 +1,17 @@
+---
+services:
+  openssh-server: # See https://hub.docker.com/r/linuxserver/openssh-server
+    image: lscr.io/linuxserver/openssh-server:latest
+    container_name: nws-node-sample
+    hostname: ${SSH_HOSTNAME}
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - PUBLIC_KEY_FILE=/pubkey
+      - USER_NAME=${SSH_USERNAME}
+    volumes:
+      - ${PWD}/${PRIVATE_KEY_PATH}.pub:/pubkey:ro
+    ports:
+      - ${SSH_PORT}:2222
+    restart: unless-stopped

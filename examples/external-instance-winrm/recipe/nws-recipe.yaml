@@ -1,0 +1,16 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: examples/windows.hello
+  version: "0.1.0"
+  description: Minimal PowerShell task on a WinRM-connected Windows node
+spec:
+
+  tasks:
+    - name: hello-windows
+      where: node.os == "windows"
+      action:
+        exec.remote:
+          scriptTpl: |
+            Write-Host "Hello from $env:COMPUTERNAME"
+            Get-Date | Out-File -FilePath "{{ .Outputs }}/hello.txt"

@@ -1,0 +1,12 @@
+# Hugo build output
+/public/
+/resources/_gen/
+
+# Hugo modules
+.hugo_build.lock
+
+# OS files
+.DS_Store
+Thumbs.db
+
+*.tar.gz

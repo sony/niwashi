@@ -1,0 +1,28 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Niwashi Catalog Schema",
+    "description": "Schema for the nws-catalog.yaml file.",
+    "type": "object",
+    "properties": {
+        "version": {
+            "description": "Schema version.",
+            "type": "string",
+            "const": "nws.catalog/v1"
+        },
+        "recipes": {
+            "description": "A map of recipes.",
+            "type": "object",
+            "additionalProperties": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "description": "The path to the recipe file, relative to the catalog file.",
+                        "type": "string"
+                    }
+                },
+                "required": ["path"]
+            }
+        }
+    },
+    "required": ["version", "recipes"]
+}

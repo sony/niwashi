@@ -1,0 +1,4 @@
+version: nws.catalog/v1
+recipes:
+  valid-recipe: 
+    path: valid-recipe.yaml

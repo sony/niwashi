@@ -1,0 +1,295 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/nws-recipe-v1.json",
+  "title": "NWS Recipe v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "metadata", "spec", "kind"],
+  "properties": {
+    "version": { "const": "nws.recipe/v1" },
+    "kind": { "type": "string", "enum": ["host", "infra", "node", "cluster", "adapter"] },
+
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "FQID: namespace/name",
+          "pattern": "^[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*$"
+        },
+        "version": {
+          "type": "string",
+          "description": "the version of this recipe as semantic version(e.g. 0.1.2, 2.3.9)"
+        },
+        "description": { "type": "string" }
+      }
+    },
+
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "executionUnit": { "type": "string", "enum": ["default", "node"], "default": "default" },
+        "allowedScope": { "type": "string", "enum": ["host", "infra", "node", "cluster", "*"] },
+
+        "provides": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "attrs": { "type": "object", "additionalProperties": { "type": "string" } }
+            }
+          }
+        },
+
+        "requires": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true,
+          "description": "FQID or abstract capability name (attrs hint supported)"
+        },
+
+        "category": { "type": "string" },
+
+        "runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string", "enum": ["tool", "service"] },
+            "name": { "type": "string" }
+          }
+        },
+
+        "workspace": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": { "type": "string", "enum": ["ephemeral", "persistent"], "default": "ephemeral" }
+          }
+        },
+
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "params": { "type": "object", "additionalProperties": true },
+            "env": { "type": "object", "additionalProperties": { "type": "string" } }
+          }
+        },
+
+        "tasks": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/task" }
+        },
+
+        "assets": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Relative paths to include for hashing and reproducibility (glob patterns supported)"
+        },
+
+        "commands": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "task": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+              "candidates": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name"],
+                  "properties": {
+                    "name": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+                    "where": { "type": "string", "description": "CEL expression to select this candidate" }
+                  }
+                }
+              },
+              "description": { "type": "string" }
+            },
+            "oneOf": [
+              { "required": ["task"] },
+              { "required": ["candidates"] }
+            ]
+          }
+        }
+      }
+    }
+  },
+
+  "if": {
+    "properties": { "kind": { "const": "adapter" } },
+    "required": ["kind"]
+  },
+  "then": {
+    "properties": {
+      "spec": { "required": ["tasks", "commands", "allowedScope"] }
+    }
+  },
+  "else": {
+    "properties": {
+      "spec": { "required": ["tasks"] }
+    }
+  },
+
+  "$defs": {
+    "duration": {
+      "type": "string",
+      "description": "Go-like duration: 30s, 5m, 1h, etc.",
+      "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$"
+    },
+
+    "taskCommon": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+        "where": {
+          "type": "string",
+          "description": "CEL expression to filter execution targets. Evaluated against each target; task runs only when true."
+        },
+        "operation": {
+          "type": "string",
+          "description": "Declares the lifecycle operation this task belongs to. Defaults to 'construct'.",
+          "enum": ["construct", "destruct", "update"],
+          "default": "construct"
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+          "uniqueItems": true
+        },
+
+        "stateChanges": {
+          "type": "object",
+          "description": "A map of state change operations. The key is a unique name for the operation.",
+          "additionalProperties": {
+            "$ref": "#/$defs/stateChangeOperation"
+          }
+        }
+      }
+    },
+
+    "stateChangeOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Defines a single or looped state change operation, distinguished by the presence of the 'count' property.",
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": ["add", "remove"]
+        },
+        "path": { "type": "string" },
+        "value": {},
+        "valueFromFile": { "type": "string" },
+        "valueFromJson": { "type": "string" },
+        "count": { "type": ["string", "integer"] }
+      },
+      "required": ["op"],
+      "allOf": [
+        {
+          "if": {
+            "properties": { "count": { "type": ["string", "integer"] } },
+            "required": ["count"]
+          },
+          "then": {
+            "description": "A looped operation that generates multiple state changes."
+          },
+          "else": {
+            "description": "A single state change operation.",
+            "properties": {
+              "op": {
+                "type": "string",
+                "enum": ["add", "remove"]
+              },
+              "path": { "type": "string" },
+              "value": {},
+              "valueFromFile": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "op": { "enum": ["add"] } },
+            "required": ["op"]
+          },
+          "then": {
+            "anyOf": [
+              { "required": ["value"] },
+              { "required": ["valueFromFile"] },
+              { "required": ["valueFromJson"] }
+            ]
+          }
+        }
+      ]
+    },
+
+    "payload.exec.local": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scriptTpl"],
+      "properties": {
+        "scriptTpl": { "type": "string" },
+        "envTpl": { "type": "object", "additionalProperties": { "type": "string" } },
+        "inheritEnv": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "payload.exec.remote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scriptTpl"],
+      "properties": {
+        "scriptTpl": { "type": "string" },
+        "envTpl": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+
+    "payload.tool.run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["toolRef", "argvTpl" ],
+      "properties": {
+        "toolRef": { "type": "string", "minLength": 1, "description": "FQID or alias (resolved by the profile)" },
+        "command": { "type": "string" },
+        "argvTpl": { "type": "array", "items": { "type": "string" } },
+        "workdirTpl": { "type": "string" },
+        "envTpl": { "type": "object", "additionalProperties": { "type": "string" } },
+        "inheritEnv": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "task": {
+      "allOf": [
+        { "$ref": "#/$defs/taskCommon" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "action"],
+          "properties": {
+            "action": {
+              "type": "object",
+              "additionalProperties": false,
+              "oneOf": [
+                { "required": ["tool.run"], "properties": { "tool.run": { "$ref": "#/$defs/payload.tool.run" } } },
+                { "required": ["exec.local"], "properties": { "exec.local": { "$ref": "#/$defs/payload.exec.local" } } },
+                { "required": ["exec.remote"], "properties": { "exec.remote": { "$ref": "#/$defs/payload.exec.remote" } } }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

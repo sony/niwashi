@@ -1,0 +1,28 @@
+version: nws.state/v1
+metadata: {}
+
+infrastructure:
+  generators:
+    local-machine:
+      provisioner: external-instance
+      params:
+        instances:
+          inst-1:
+            connection:
+              ssh:
+                address:
+                  host: 127.0.0.1
+                  port: 2222
+                  user: nwsuser
+                auth:
+                  privateKeyPath: ./id_ed25519
+                hostKey:
+                  knownHostsPath: ./known_hosts
+
+inventory:
+  nodes:
+    hello-node:
+      instanceSelector:
+        generator: local-machine
+      capabilities:
+        - examples.node.hello
