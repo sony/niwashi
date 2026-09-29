@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# go releaser
+go install github.com/goreleaser/goreleaser/v2@latest
+

@@ -1,0 +1,9 @@
+__pycache__
+.vagrant
+.niwashi
+dist/
+bin/
+.covdata/
+nwsctl
+nwsctl-cov
+.claude/
