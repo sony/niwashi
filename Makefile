@@ -11,6 +11,7 @@ RELEASE_FLAG:=--snapshot
 endif
 
 GOLANGCI_LINT_BIN := ./bin/golangci-lint
+GOLANGCI_LINT_VERSION := $(shell cat .golangci-lint-version)
 
 TARGET := nwsctl
 
@@ -21,7 +22,7 @@ all: build
 setup: setup-golangci-lint
 
 setup-golangci-lint:
-	curl -sSfL https://golangci-lint.run/install.sh | sh -s v2.12.2
+	curl -sSfL https://golangci-lint.run/install.sh | sh -s $(GOLANGCI_LINT_VERSION)
 
 $(GOLANGCI_LINT_BIN):
 	@echo "golangci-lint is not installed. Please run 'make setup' to install it."
