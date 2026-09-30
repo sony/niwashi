@@ -52,6 +52,7 @@ relativeURLs = true
 
 # global params
 [params]
+  BookSection = "*"
   BookRepo = "https://github.com/sony/niwashi"
   BookSearch = true
   BookToC = true
