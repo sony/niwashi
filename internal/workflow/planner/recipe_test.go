@@ -74,7 +74,13 @@ func newFixtureRecipe(kind, id string, requires ...string) *recipe.Recipe {
 }
 
 func newEmptyState() *state.State {
-	return &state.State{Inventory: &state.Inventory{Nodes: map[string]*node.Node{}}}
+	return &state.State{
+		Stage: state.Stage{
+			Inventory: &state.Inventory{
+				Nodes: map[string]*node.Node{},
+			},
+		},
+	}
 }
 
 func hasEdge(g *workflow.DagGraph, fromId, toId string) bool {
@@ -138,9 +144,11 @@ func TestRecipeDagVertex_BuildRequiresEdge_SkipsAlreadySatisfiedDependency(t *te
 	finder := newFakeRecipeFinder(lib, app)
 
 	baseState := &state.State{
-		Inventory: &state.Inventory{
-			Nodes: map[string]*node.Node{
-				"node-1": {Capabilities: cap.CapabilityList{"org/lib": &cap.Capability{}}},
+		Stage: state.Stage{
+			Inventory: &state.Inventory{
+				Nodes: map[string]*node.Node{
+					"node-1": {Capabilities: cap.CapabilityList{"org/lib": &cap.Capability{}}},
+				},
 			},
 		},
 	}

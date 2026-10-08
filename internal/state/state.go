@@ -6,22 +6,20 @@ package state
 import (
 	"fmt"
 
-	"github.com/sony/niwashi/internal/cap"
 	"github.com/sony/niwashi/internal/cmap"
-	"github.com/sony/niwashi/internal/logger"
 	"github.com/sony/niwashi/internal/profile"
 	"github.com/sony/niwashi/internal/types"
 )
 
 type State struct {
-	Version        string          `json:"version" yaml:"version"`
-	Metadata       types.Dict      `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Template       *Template       `json:"template,omitempty" yaml:"template,omitempty"`
-	Inventory      *Inventory      `json:"inventory,omitempty" yaml:"inventory,omitempty"`
-	Infrastructure *Infrastructure `json:"infrastructure,omitempty" yaml:"infrastructure,omitempty"`
-	Runtime        *Runtime        `json:"runtime,omitempty" yaml:"runtime,omitempty"`
-	Status         *Status         `json:"status,omitempty" yaml:"status,omitempty"`
-	Hash           string          `json:"-" yaml:"-"`
+	Version  string     `json:"version" yaml:"version"`
+	Metadata types.Dict `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Template *Template  `json:"template,omitempty" yaml:"template,omitempty"`
+	Stage    `yaml:",inline"`
+	Runtime  *Runtime `json:"runtime,omitempty" yaml:"runtime,omitempty"`
+	Status   *Status  `json:"status,omitempty" yaml:"status,omitempty"`
+	Hash     string   `json:"-" yaml:"-"`
+	Stages   Stages   `json:"stages,omitempty" yaml:"stages,omitempty"`
 }
 
 func NewState() *State {
@@ -43,10 +41,10 @@ func (s *State) Clone() *State {
 	clone.Version = s.Version
 	clone.Metadata = s.Metadata.Clone()
 	clone.Template = s.Template.Clone()
-	clone.Inventory = s.Inventory.Clone()
-	clone.Infrastructure = s.Infrastructure.Clone()
 	clone.Runtime = s.Runtime.Clone()
 	clone.Status = s.Status.Clone()
+	clone.Stage = *s.Stage.clone() //nolint:staticcheck
+	clone.Stages = s.Stages.clone()
 
 	return clone
 }
@@ -58,15 +56,12 @@ func (s *State) SetDefaults() {
 	}
 
 	// fill minimal required fields
-	if s.Infrastructure == nil {
-		s.Infrastructure = &Infrastructure{}
-	}
-	s.Infrastructure.SetDefaults()
+	s.Stage.setDefaults() //nolint:staticcheck
 
-	if s.Inventory == nil {
-		s.Inventory = NewInventory()
+	if s.Stages == nil {
+		s.Stages = Stages{}
 	}
-	s.Inventory.SetDefaults()
+	s.Stages.setDefaults()
 
 	if s.Runtime == nil {
 		s.Runtime = &Runtime{}
@@ -90,8 +85,8 @@ func (s *State) Merge(other *State) (*State, error) {
 
 	// Merge only the following fields:
 	// - Template
-	// - Inventory
-	// - Infrastructure
+	// - Stage (the main stage)
+	// - Stages
 	clone := &State{
 		Version:  s.Version,
 		Metadata: s.Metadata.Clone(),
@@ -104,11 +99,16 @@ func (s *State) Merge(other *State) (*State, error) {
 	if err != nil {
 		return nil, err
 	}
-	clone.Inventory, err = s.Inventory.Merge(other.Inventory)
+
+	// "main" stage
+	stage, err := s.Stage.merge(&other.Stage) //nolint:staticcheck
 	if err != nil {
 		return nil, err
 	}
-	clone.Infrastructure, err = s.Infrastructure.Merge(other.Infrastructure)
+	clone.Stage = *stage
+
+	// Merge other stages
+	clone.Stages, err = s.Stages.merge(other.Stages)
 	if err != nil {
 		return nil, err
 	}
@@ -121,31 +121,12 @@ func (s *State) ApplyTemplates() error {
 		return nil
 	}
 
-	if len(s.Template.Node) != 0 {
-		for _, n := range s.Inventory.Nodes {
-			err := n.ApplyTemplate(s.Template.Node)
-			if err != nil {
-				return err
-			}
-		}
+	if err := s.Stage.applyTemplate(s.Template); err != nil { //nolint:staticcheck
+		return err
 	}
 
-	if len(s.Template.Cluster) != 0 {
-		for _, cluster := range s.Inventory.Clusters {
-			err := cluster.ApplyTemplate(s.Template.Cluster)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	if len(s.Template.Generator) != 0 {
-		for _, inst := range s.Infrastructure.Generators {
-			err := inst.ApplyTemplate(s.Template.Generator)
-			if err != nil {
-				return err
-			}
-		}
+	if err := s.Stages.applyTemplate(s.Template); err != nil {
+		return err
 	}
 
 	return nil
@@ -160,37 +141,15 @@ func (s *State) Normalize(f cmap.RecipeFinder) error {
 		return fmt.Errorf("RecipeFinder is required for normalization")
 	}
 
-	// Normalize for each capabilities in nodes and clusters
-	var err error
-	var caps cap.CapabilityList
-	if s.Inventory != nil {
-		for _, node := range s.Inventory.Nodes {
-			caps, err = node.Capabilities.Normalize(f)
-			if err != nil {
-				return err
-			}
-			node.Capabilities = caps
-		}
-		for _, cluster := range s.Inventory.Clusters {
-			caps, err = cluster.Capabilities.Normalize(f)
-			if err != nil {
-				return err
-			}
-			cluster.Capabilities = caps
-		}
+	// "main" stage
+	if err := s.Stage.normalize(f); err != nil { //nolint:staticcheck
+		return err
 	}
 
-	// Normalize provisioner in instances
-	for _, inst := range s.Infrastructure.Generators {
-		if inst.Provisioner != "" {
-			recipe, err := f.FindRecipe(inst.Provisioner)
-			if err != nil {
-				return err
-			}
-			if inst.Provisioner != recipe.Fqid() {
-				logger.Info("UpdateRecipeAlias", "from", inst.Provisioner, "to", recipe.Fqid())
-			}
-			inst.Provisioner = recipe.Fqid()
+	// other stages
+	if s.Stages != nil {
+		if err := s.Stages.normalize(f); err != nil {
+			return err
 		}
 	}
 
@@ -198,84 +157,47 @@ func (s *State) Normalize(f cmap.RecipeFinder) error {
 }
 
 func (s *State) ResolveParams(prof *profile.Profile) error {
+	if s == nil {
+		return nil
+	}
+	if prof == nil {
+		return nil
+	}
 
-	// for node capability
-	for _, node := range s.Inventory.Nodes {
-		for id, cap := range node.Capabilities {
-			id = cap.SearchId(id)
-			pcap, exist := prof.Params.Capabilities[id]
-			if exist {
-				var mergedParam types.Dict
+	// "main" stage
+	if err := s.Stage.resolveParams(prof); err != nil { //nolint:staticcheck
+		return err
+	}
 
-				// capability in profile has higher priority than that in state
-				mergedParam, err := types.Merge(cap.Params, pcap)
-				if err != nil {
-					return err
-				}
-				cap.Params = mergedParam
-			}
+	// other stages
+	if s.Stages != nil {
+		if err := s.Stages.resolveParams(prof); err != nil {
+			return err
 		}
 	}
 
-	// for cluster capability
-	for _, cluster := range s.Inventory.Clusters {
-
-		// params of cluster in state
-		stateCluster := cluster.Params
-
-		// params of cluster in profile
-		profCluster := prof.Params.Clusters[cluster.Version]
-
-		for id, cap := range cluster.Capabilities {
-			// params of capability in profile
-			id = cap.SearchId(id)
-			profCap := prof.Params.Capabilities[id]
-
-			// params of capability in state
-			var stateCap types.Dict
-			if len(cap.Params) > 0 {
-				stateCap = cap.Params
-			}
-
-			// Priority: cluster params in state < capability in state < cluster params in profile < capability in profile
-			var mergedParam types.Dict
-			var err error
-			mergedParam, err = types.Merge(stateCluster, stateCap)
-			if err != nil {
-				return err
-			}
-			mergedParam, err = types.Merge(mergedParam, profCluster)
-			if err != nil {
-				return err
-			}
-			mergedParam, err = types.Merge(mergedParam, profCap)
-			if err != nil {
-				return err
-			}
-
-			// Replace capability params
-			cap.Params = mergedParam
-		}
-
-		// clear cluster's params after merged
-		cluster.Params = make(types.Params)
-	}
 	return nil
 }
 
-func (s *State) Stage(name string) (*StageView, error) {
+func (s *State) StageView(name string) (*StageView, error) {
 	if s == nil {
 		return nil, fmt.Errorf("state is nil")
 	}
 
-	// todo: switch stage based on the stage name if needed
 	if name == DefaultStageName {
-		return &StageView{
-			Inventory:      s.Inventory,
-			Infrastructure: s.Infrastructure,
-			Runtime:        s.Runtime,
-		}, nil
+		return s.makeStageView(&s.Stage), nil
 	} else {
+		if stage, exist := s.Stages.Find(name); exist {
+			return s.makeStageView(stage), nil
+		}
 		return nil, fmt.Errorf("unsupported stage name: %s", name)
+	}
+}
+
+func (s *State) makeStageView(stage *Stage) *StageView {
+	return &StageView{
+		Inventory:      stage.Inventory,
+		Infrastructure: stage.Infrastructure,
+		Runtime:        s.Runtime,
 	}
 }

@@ -62,7 +62,7 @@ func (sm *stateManager) State() *state.State {
 }
 
 func (sm *stateManager) StageView() *state.StageView {
-	sv, _ := sm.state.Stage(state.DefaultStageName)
+	sv, _ := sm.state.StageView(state.DefaultStageName)
 	return sv
 }
 
@@ -86,7 +86,7 @@ func (sm *stateManager) ApplyPatches(
 	backupState := sm.state.Clone()
 
 	// create stage view for applying patches
-	sv, err := backupState.Stage(state.DefaultStageName)
+	sv, err := backupState.StageView(state.DefaultStageName)
 	if err != nil {
 		return errors.Join(err, fmt.Errorf("failed to create stage view"))
 	}
