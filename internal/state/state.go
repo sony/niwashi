@@ -9,7 +9,6 @@ import (
 	"github.com/sony/niwashi/internal/cap"
 	"github.com/sony/niwashi/internal/cmap"
 	"github.com/sony/niwashi/internal/logger"
-	"github.com/sony/niwashi/internal/patch"
 	"github.com/sony/niwashi/internal/profile"
 	"github.com/sony/niwashi/internal/types"
 )
@@ -262,90 +261,6 @@ func (s *State) ResolveParams(prof *profile.Profile) error {
 		cluster.Params = make(types.Params)
 	}
 	return nil
-}
-
-func (s *State) Add(path []string, value any) error {
-	if len(path) == 0 {
-		return fmt.Errorf("path cannot be empty")
-	}
-
-	switch path[0] {
-	case "inventory":
-		return patch.AddValue(
-			path[1:],
-			value,
-			func() (*Inventory, bool) {
-				return s.Inventory, s.Inventory != nil
-			},
-			func(v *Inventory) {
-				s.Inventory = v
-			})
-	case "infrastructure":
-		return patch.AddValue(
-			path[1:],
-			value,
-			func() (*Infrastructure, bool) {
-				return s.Infrastructure, s.Infrastructure != nil
-			},
-			func(v *Infrastructure) {
-				s.Infrastructure = v
-			})
-	case "runtime":
-		return patch.AddValue(
-			path[1:],
-			value,
-			func() (*Runtime, bool) {
-				return s.Runtime, s.Runtime != nil
-			},
-			func(v *Runtime) {
-				s.Runtime = v
-			})
-	default:
-		return fmt.Errorf("unsupported path: %s", path[0])
-	}
-}
-
-func (s *State) Remove(path []string) error {
-
-	if len(path) == 0 {
-		return fmt.Errorf("path cannot be empty")
-	}
-
-	switch path[0] {
-	case "inventory":
-		return patch.RemoveComposite(
-			path[1:],
-			func() (*Inventory, bool) {
-				return s.Inventory, s.Inventory != nil
-			},
-			func() {
-				s.Inventory = nil
-			})
-	case "infrastructure":
-		return patch.RemoveComposite(
-			path[1:],
-			func() (*Infrastructure, bool) {
-				return s.Infrastructure, s.Infrastructure != nil
-			},
-			func() {
-				s.Infrastructure = nil
-			})
-	case "runtime":
-		return patch.RemoveComposite(
-			path[1:],
-			func() (*Runtime, bool) {
-				return s.Runtime, s.Runtime != nil
-			},
-			func() {
-				s.Runtime = nil
-			})
-	default:
-		return fmt.Errorf("unsupported path: %s", path[0])
-	}
-}
-
-func (s *State) Update(o patch.Patchable) error {
-	return fmt.Errorf("not supported update for State")
 }
 
 func (s *State) Stage(name string) (*StageView, error) {

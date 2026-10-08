@@ -133,7 +133,7 @@ func (ct *NodeBindTask) AfterRun(runErr error) error {
 
 	// init
 	patches := []patch.Patch{}
-	s := ct.ctx.State()
+	s := ct.ctx.StageView()
 	binder := instance.NewBinder(s.Infrastructure.Generators)
 
 	for _, i := range ct.Nodes {
@@ -191,7 +191,7 @@ func (ct *NodeBindTask) AfterRun(runErr error) error {
 
 func (ct *NodeBindTask) BoundAlready(nodeName string) (bool, error) {
 
-	inst := ct.ctx.State().GetBoundInstance(nodeName)
+	inst := ct.ctx.StageView().GetBoundInstance(nodeName)
 	if inst == nil {
 		return false, nil
 	}
@@ -240,7 +240,7 @@ func (dt *NodeUnbindTask) AfterRun(runErr error) error {
 	for _, nodeName := range dt.Nodes {
 
 		// skip if node not found
-		if dt.ctx.State().GetNode(nodeName) == nil {
+		if dt.ctx.StageView().GetNode(nodeName) == nil {
 			logger.Warn("node not found, skipping", "node", nodeName)
 			continue
 		}
@@ -259,7 +259,7 @@ func (dt *NodeUnbindTask) AfterRun(runErr error) error {
 		))
 
 		// Remove entry from known_hosts
-		inst := dt.ctx.State().GetBoundInstance(nodeName)
+		inst := dt.ctx.StageView().GetBoundInstance(nodeName)
 		if inst == nil {
 			return fmt.Errorf("failed to get instance for node %q", nodeName)
 		}
@@ -283,7 +283,7 @@ func (dt *NodeUnbindTask) AfterRun(runErr error) error {
 func (dt *NodeUnbindTask) CreateUnbindPatch(nodeName string) ([]patch.Patch, error) {
 	patches := []patch.Patch{}
 
-	inst := dt.ctx.State().GetBoundInstance(nodeName)
+	inst := dt.ctx.StageView().GetBoundInstance(nodeName)
 	if inst == nil {
 		return nil, fmt.Errorf("instance not found for node %q", nodeName)
 	}

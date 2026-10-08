@@ -49,7 +49,7 @@ type Node struct {
 
 type Cluster cluster.Cluster
 
-func NewStateFrom(s *state.Accessor, nodes []string, clusters []string) (*State, error) {
+func NewStateFrom(s *state.StageView, nodes []string, clusters []string) (*State, error) {
 	context := &State{
 		Host: &Node{
 			Os:   platform.HostOs,

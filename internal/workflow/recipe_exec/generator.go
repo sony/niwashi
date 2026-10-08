@@ -79,7 +79,7 @@ func (g *taskGenerator) GetOperation() string {
 func (g *taskGenerator) GetRuntimeState() *runtime.State {
 	if g.dirtyState {
 		// Save runtime state file for the action
-		s := g.ApplyContext.State()
+		s := g.ApplyContext.StageView()
 		phase := g.recipeWs.Phase
 		target := g.recipeWs.Target
 		runtimeState, err := createRuntimeState(s, phase, target)
@@ -95,13 +95,13 @@ func (g *taskGenerator) GetRuntimeState() *runtime.State {
 }
 
 func (g *taskGenerator) GetStoreData() map[string]any {
-	s := g.ApplyContext.State()
+	s := g.ApplyContext.StageView()
 	r := g.recipe
 
 	return getStoreData(s, r, g.recipeWs.Target)
 }
 
-func getStoreData(s *state.Accessor, r RecipeSpec, target string) map[string]any {
+func getStoreData(s *state.StageView, r RecipeSpec, target string) map[string]any {
 
 	var store map[string]any
 
@@ -139,7 +139,7 @@ func getStoreData(s *state.Accessor, r RecipeSpec, target string) map[string]any
 	return store
 }
 
-func getHostStoreData(s *state.Accessor, r RecipeSpec) map[string]any {
+func getHostStoreData(s *state.StageView, r RecipeSpec) map[string]any {
 	var store map[string]any
 
 	// Get data from runtime
@@ -264,7 +264,7 @@ func _newRecipeTaskGenerator(ctx workflow.ApplyContext, job *workflow.Job) (*tas
 	return gen, nil
 }
 
-func createRuntimeState(s *state.Accessor, phase, target string) (*runtime.State, error) {
+func createRuntimeState(s *state.StageView, phase, target string) (*runtime.State, error) {
 	nodes := []string{}
 	clusters := []string{}
 	switch phase {

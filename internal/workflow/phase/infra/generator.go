@@ -24,7 +24,7 @@ func NewInfraTaskGenerator(ctx workflow.ApplyContext, job *workflow.Job) (workfl
 	case recipe.OperationConstruct:
 		// copy infra state before apply patches
 		rtg.GetRunState().AddEnterFunc(func() {
-			err := fillInfraState(ctx, ctx.TargetState(), rtg.GetRecipeWs().Target)
+			err := fillInfraState(ctx, ctx.TargetStageView(), rtg.GetRecipeWs().Target)
 			if err != nil {
 				rtg.HoldError(err)
 			}
@@ -53,11 +53,11 @@ func NewInfraTaskGenerator(ctx workflow.ApplyContext, job *workflow.Job) (workfl
 
 func fillInfraState(
 	sm workflow.StateManager,
-	targetState *state.Accessor,
+	targetState *state.StageView,
 	target string) error {
 
 	// If generator info already exists, do nothing
-	s := sm.State()
+	s := sm.StageView()
 	if s.GetGenerator(target) != nil {
 		return nil
 	}
@@ -83,7 +83,7 @@ func fillInfraState(
 
 func removeInfraState(sm workflow.StateManager, target string) error {
 
-	s := sm.State()
+	s := sm.StageView()
 
 	// If generator info not exists, do nothing
 	if s.GetGenerator(target) == nil {

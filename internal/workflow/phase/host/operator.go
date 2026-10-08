@@ -51,7 +51,7 @@ func (o *Operator) GetRuntimeNode(s *runtime.State, subject *recipe_exec.Subject
 }
 
 func (o *Operator) GetPatchValidator() recipe_exec.Validator {
-	return func(s *state.Accessor, target string) error {
+	return func(s *state.StageView, target string) error {
 		return nil
 	}
 }
