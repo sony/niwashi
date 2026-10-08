@@ -43,7 +43,7 @@ func (p *NodeSyncPlanner) BuildVertices(ctx planner.Context) error {
 	node_sync := types.Dict{}
 
 	for _, name := range diff.Node {
-		node := ctx.State().GetNode(name)
+		node := ctx.StageView().GetNode(name)
 		if node == nil {
 			return fmt.Errorf("failed to find node %q in state", name)
 		}

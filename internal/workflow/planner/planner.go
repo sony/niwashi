@@ -126,7 +126,11 @@ func (p *Planner) MakePlan() (*plan.Plan, error) {
 	}
 
 	logger.Debug("Building plan", "operation", operation)
-	ctx := NewContext(operation, p.finder, targetState, baseState, diff, updateDiff)
+	ctx, err := NewContext(operation, p.finder, targetState, baseState, diff, updateDiff)
+	if err != nil {
+		return nil, err
+	}
+
 	err = CreateGraph(ctx)
 	if err != nil {
 		return nil, err

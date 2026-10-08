@@ -22,7 +22,7 @@ func (p *ClusterCapPlanner) BuildVertices(ctx planner.Context) error {
 	// Cluster capabilities
 	for clusterName, c := range diff.Capability.Cluster {
 
-		cluster := ctx.State().GetCluster(clusterName)
+		cluster := ctx.StageView().GetCluster(clusterName)
 		if cluster == nil {
 			return fmt.Errorf("failed to find cluster %q in state", clusterName)
 		}

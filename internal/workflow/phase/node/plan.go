@@ -21,7 +21,7 @@ func (p *NodeCapPlanner) BuildVertices(ctx planner.Context) error {
 
 	// Node capabilities
 	for nodeName, caps := range diff.Capability.Node {
-		node := ctx.State().GetNode(nodeName)
+		node := ctx.StageView().GetNode(nodeName)
 		if node == nil {
 			return fmt.Errorf("failed to find node %q in state", nodeName)
 		}

@@ -8,11 +8,9 @@ import (
 
 	"github.com/sony/niwashi/internal/cap"
 	"github.com/sony/niwashi/internal/cmap"
-	"github.com/sony/niwashi/internal/instance"
 	"github.com/sony/niwashi/internal/logger"
 	"github.com/sony/niwashi/internal/patch"
 	"github.com/sony/niwashi/internal/profile"
-	"github.com/sony/niwashi/internal/transport"
 	"github.com/sony/niwashi/internal/types"
 )
 
@@ -266,35 +264,6 @@ func (s *State) ResolveParams(prof *profile.Profile) error {
 	return nil
 }
 
-func (s *State) GetConnection(nodeId string) *transport.Connection {
-	if s == nil || s.Inventory == nil || s.Inventory.Nodes == nil {
-		return nil
-	}
-
-	st := NewAccessor(s)
-
-	node := st.GetNode(nodeId)
-	if node == nil {
-		return nil
-	}
-
-	// look for instance connection
-	if node.InstanceRef == "" {
-		return nil
-	}
-
-	genName, instName := instance.ParseInstanceRef(node.InstanceRef)
-	instance := st.GetGenerator(genName).GetInstance(instName)
-	if instance == nil {
-		return nil
-	}
-	c := instance.Connection.Clone()
-	if c != nil {
-		c.SetDefaults()
-	}
-	return c
-}
-
 func (s *State) Add(path []string, value any) error {
 	if len(path) == 0 {
 		return fmt.Errorf("path cannot be empty")
@@ -338,6 +307,10 @@ func (s *State) Add(path []string, value any) error {
 
 func (s *State) Remove(path []string) error {
 
+	if len(path) == 0 {
+		return fmt.Errorf("path cannot be empty")
+	}
+
 	switch path[0] {
 	case "inventory":
 		return patch.RemoveComposite(
@@ -373,4 +346,21 @@ func (s *State) Remove(path []string) error {
 
 func (s *State) Update(o patch.Patchable) error {
 	return fmt.Errorf("not supported update for State")
+}
+
+func (s *State) Stage(name string) (*StageView, error) {
+	if s == nil {
+		return nil, fmt.Errorf("state is nil")
+	}
+
+	// todo: switch stage based on the stage name if needed
+	if name == DefaultStageName {
+		return &StageView{
+			Inventory:      s.Inventory,
+			Infrastructure: s.Infrastructure,
+			Runtime:        s.Runtime,
+		}, nil
+	} else {
+		return nil, fmt.Errorf("unsupported stage name: %s", name)
+	}
 }

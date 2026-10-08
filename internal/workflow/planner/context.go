@@ -13,8 +13,8 @@ type Context interface {
 	cmap.RecipeFinder
 	workflow.Graph
 	Operation() string
-	State() *state.Accessor     // target state
-	BaseState() *state.Accessor // base state
+	StageView() *state.StageView     // target state
+	BaseStageView() *state.StageView // base state
 	Diff() *state.Difference
 	UpdateDiff() *state.Difference
 	Graph() *workflow.DagGraph
@@ -24,12 +24,11 @@ type Context interface {
 type context struct {
 	cmap.RecipeFinder
 	*workflow.DagGraph
-	state         *state.Accessor
-	baseState     *state.Accessor
-	diff          *state.Difference
-	updateDiff    *state.Difference
-	operation     string
-	skippedRecipe []string
+	state, baseState         *state.State
+	stageView, baseStageView *state.StageView
+	diff, updateDiff         *state.Difference
+	operation                string
+	skippedRecipe            []string
 }
 
 func NewContext(
@@ -38,31 +37,36 @@ func NewContext(
 	s *state.State,
 	baseState *state.State,
 	diff *state.Difference,
-	updateDiff *state.Difference) *context {
+	updateDiff *state.Difference) (*context, error) {
 
 	ctx := &context{
 		RecipeFinder: f,
 		operation:    op,
 		diff:         diff,
 		updateDiff:   updateDiff,
-		state:        state.NewAccessor(s),
-		baseState:    state.NewAccessor(baseState),
+		state:        s,
+		baseState:    baseState,
 		DagGraph:     workflow.NewDagGraph(),
 	}
 
-	return ctx
+	err := ctx.SetStageName(state.DefaultStageName)
+	if err != nil {
+		return nil, err
+	}
+
+	return ctx, nil
 }
 
 func (pc *context) Operation() string {
 	return pc.operation
 }
 
-func (pc *context) State() *state.Accessor {
-	return pc.state
+func (pc *context) StageView() *state.StageView {
+	return pc.stageView
 }
 
-func (pc *context) BaseState() *state.Accessor {
-	return pc.baseState
+func (pc *context) BaseStageView() *state.StageView {
+	return pc.baseStageView
 }
 
 func (pc *context) Diff() *state.Difference {
@@ -83,4 +87,25 @@ func (pc *context) AddSkippedRecipe(phase, target, fqid string) {
 
 func (pc *context) SkippedRecipe() []string {
 	return pc.skippedRecipe
+}
+
+func (pc *context) SetStageName(stageName string) error {
+
+	// todo: switch diff
+
+	sv, err := pc.state.Stage(stageName)
+	if err != nil {
+		return err
+	}
+
+	var baseSv *state.StageView
+	if pc.baseState != nil {
+		baseSv, err = pc.baseState.Stage(stageName)
+		if err != nil {
+			return err
+		}
+	}
+	pc.stageView = sv
+	pc.baseStageView = baseSv
+	return nil
 }
