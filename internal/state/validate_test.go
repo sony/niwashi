@@ -4,6 +4,7 @@
 package state_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/sony/niwashi/internal/cap"
@@ -11,6 +12,7 @@ import (
 	"github.com/sony/niwashi/internal/instance"
 	"github.com/sony/niwashi/internal/node"
 	"github.com/sony/niwashi/internal/state"
+	"github.com/sony/niwashi/internal/types"
 )
 
 func TestState_Validate(t *testing.T) {
@@ -269,5 +271,78 @@ func TestState_Validate(t *testing.T) {
 				t.Fatal("Validate() succeeded unexpectedly")
 			}
 		})
+	}
+}
+
+func TestState_Validate_Export(t *testing.T) {
+	tests := []struct {
+		name    string
+		state   func() *state.State
+		wantErr bool
+	}{
+		{
+			name: "export in the main stage",
+			state: func() *state.State {
+				s := state.NewState()
+				s.Export = types.Dict{"proxy_ca_cert": types.Dict{}}
+				return s
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty export in the main stage",
+			state: func() *state.State {
+				s := state.NewState()
+				s.Export = types.Dict{}
+				return s
+			},
+			wantErr: true,
+		},
+		{
+			name: "export in a pre-stage",
+			state: func() *state.State {
+				s := state.NewState()
+				s.Stages["bootstrap"] = &state.Stage{
+					Export: types.Dict{"proxy_ca_cert": types.Dict{}},
+				}
+				s.SetDefaults()
+				return s
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.state().Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestState_Validate_StageNameInError(t *testing.T) {
+	s := state.NewState()
+	s.Stages["bootstrap"] = &state.Stage{
+		Inventory: &state.Inventory{
+			Nodes: map[string]*node.Node{
+				"node1": {
+					Capabilities: cap.CapabilityList{
+						"cap1": &cap.Capability{
+							Params: map[string]any{"invalid.name": "value"},
+						},
+					},
+				},
+			},
+		},
+	}
+	s.SetDefaults()
+
+	err := s.Validate()
+	if err == nil {
+		t.Fatal("Validate() succeeded unexpectedly")
+	}
+	if !strings.Contains(err.Error(), `stage "bootstrap"`) {
+		t.Errorf("Validate() error = %q, want it to contain the stage name", err)
 	}
 }
