@@ -23,14 +23,15 @@ type fakeStateManager struct {
 	err     error
 }
 
-func (f *fakeStateManager) ApplyPatches(patches []patch.Patch, _ patch.PathConstraint, _ func(*state.Accessor) error) error {
+func (f *fakeStateManager) ApplyPatches(patches []patch.Patch, _ patch.PathConstraint, _ func(*state.StageView) error) error {
 	f.patches = append(f.patches, patches...)
 	return f.err
 }
 
-func (f *fakeStateManager) State() *state.Accessor { return nil }
-func (f *fakeStateManager) SaveState() error       { return nil }
-func (f *fakeStateManager) IsStateDirty() bool     { return false }
+func (f *fakeStateManager) State() *state.State         { return nil }
+func (f *fakeStateManager) StageView() *state.StageView { return nil }
+func (f *fakeStateManager) SaveState() error            { return nil }
+func (f *fakeStateManager) IsStateDirty() bool          { return false }
 
 func newTestRecipeSpec(id, version string) recipe_exec.RecipeSpec {
 	r := &recipe.Recipe{
@@ -194,7 +195,7 @@ func clusterStateWith(c *cap.Capability) *state.State {
 	}}
 }
 
-func lookupCapability(s *state.Accessor, prefix, target, id string) *cap.Capability {
+func lookupCapability(s *state.State, prefix, target, id string) *cap.Capability {
 	switch prefix {
 	case "/inventory/nodes":
 		if n, ok := s.Inventory.Nodes[target]; ok {
@@ -275,7 +276,7 @@ func TestUpdateCapability(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sm := applier.NewStateManager(state.NewAccessor(tt.initial))
+			sm := applier.NewStateManager(tt.initial)
 			r := newTestRecipeSpec("my/recipe", "1.1.0")
 			job := &workflow.Job{Data: tt.jobData}
 

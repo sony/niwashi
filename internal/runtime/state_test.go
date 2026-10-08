@@ -18,7 +18,7 @@ func TestNewStateFrom(t *testing.T) {
 	tests := []struct {
 		name string // description of this test case
 		// Named input parameters for target function.
-		s        *state.State
+		s        *state.StageView
 		nodes    []string
 		clusters []string
 		want     *runtime.State
@@ -26,7 +26,7 @@ func TestNewStateFrom(t *testing.T) {
 	}{
 		{
 			name: "no selected nodes or clusters",
-			s: &state.State{
+			s: &state.StageView{
 				Inventory: &state.Inventory{
 					Nodes: map[string]*node.Node{
 						"node1": {},
@@ -55,7 +55,7 @@ func TestNewStateFrom(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, gotErr := runtime.NewStateFrom(state.NewAccessor(tt.s), tt.nodes, tt.clusters)
+			got, gotErr := runtime.NewStateFrom(tt.s, tt.nodes, tt.clusters)
 			if gotErr != nil {
 				if !tt.wantErr {
 					t.Errorf("NewStateFrom() failed: %v", gotErr)
