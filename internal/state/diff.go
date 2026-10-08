@@ -208,12 +208,14 @@ func newUpdateDifference(initial, target *State) (*Difference, error) {
 
 func newEmptyState() *State {
 	return &State{
-		Inventory: &Inventory{
-			Nodes:    nil,
-			Clusters: nil,
-		},
-		Infrastructure: &Infrastructure{
-			Generators: nil,
+		Stage: Stage{
+			Inventory: &Inventory{
+				Nodes:    nil,
+				Clusters: nil,
+			},
+			Infrastructure: &Infrastructure{
+				Generators: nil,
+			},
 		},
 	}
 }

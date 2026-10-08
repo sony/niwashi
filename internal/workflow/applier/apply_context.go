@@ -100,7 +100,7 @@ func (c *applyContext) TargetState() *state.State {
 }
 
 func (c *applyContext) TargetStageView() *state.StageView {
-	sv, err := c.targetState.Stage(state.DefaultStageName)
+	sv, err := c.targetState.StageView(state.DefaultStageName)
 	if err != nil {
 		logger.Error("failed to create target stage view", "error", err)
 		// todo: raise error to caller or validate stage name earlier

@@ -62,7 +62,7 @@ func RunSshCmd(data *SshData) (err error) {
 	}
 
 	// todo: Handle multiple stages if necessary
-	sv, err := s.Stage(state.DefaultStageName)
+	sv, err := s.StageView(state.DefaultStageName)
 	if err != nil {
 		return err
 	}

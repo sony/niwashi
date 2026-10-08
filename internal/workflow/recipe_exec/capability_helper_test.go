@@ -180,9 +180,13 @@ func nodeStateWith(c *cap.Capability) *state.State {
 	if c != nil {
 		caps["my/recipe"] = c
 	}
-	return &state.State{Inventory: &state.Inventory{
-		Nodes: map[string]*node.Node{"node-1": {Capabilities: caps}},
-	}}
+	return &state.State{
+		Stage: state.Stage{
+			Inventory: &state.Inventory{
+				Nodes: map[string]*node.Node{"node-1": {Capabilities: caps}},
+			},
+		},
+	}
 }
 
 func clusterStateWith(c *cap.Capability) *state.State {
@@ -190,9 +194,13 @@ func clusterStateWith(c *cap.Capability) *state.State {
 	if c != nil {
 		caps["my/recipe"] = c
 	}
-	return &state.State{Inventory: &state.Inventory{
-		Clusters: map[string]*cluster.Cluster{"cluster-1": {Capabilities: caps}},
-	}}
+	return &state.State{
+		Stage: state.Stage{
+			Inventory: &state.Inventory{
+				Clusters: map[string]*cluster.Cluster{"cluster-1": {Capabilities: caps}},
+			},
+		},
+	}
 }
 
 func lookupCapability(s *state.State, prefix, target, id string) *cap.Capability {

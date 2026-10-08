@@ -7,21 +7,23 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/sony/niwashi/internal/instance"
 	"github.com/sony/niwashi/internal/types"
 )
 
 func (s *State) Validate() error {
 	var err error
 
-	if s.Infrastructure != nil {
-		if e := s.Infrastructure.Validate(); e != nil {
-			err = errors.Join(err, e)
-		}
+	if e := s.Stage.validate(); e != nil { //nolint:staticcheck
+		err = errors.Join(err, e)
 	}
 
-	if s.Inventory != nil {
-		if e := s.Inventory.Validate(); e != nil {
+	// deny "export" field
+	if s.Export != nil {
+		err = errors.Join(err, fmt.Errorf("export field is not allowed in the main stage"))
+	}
+
+	if s.Stages != nil {
+		if e := s.Stages.validate(); e != nil {
 			err = errors.Join(err, e)
 		}
 	}
@@ -32,11 +34,6 @@ func (s *State) Validate() error {
 		}
 	}
 
-	e := s.ValidateNodeBinding()
-	if e != nil {
-		err = errors.Join(err, e)
-	}
-
 	if s.Runtime != nil {
 		if e := s.Runtime.Validate(); e != nil {
 			err = errors.Join(err, fmt.Errorf("invalid runtime: %w", e))
@@ -44,94 +41,6 @@ func (s *State) Validate() error {
 	}
 
 	return err
-}
-
-func (s *State) findInstance(genName, instName string) (*instance.Generator, *instance.Instance, error) {
-	if s.Infrastructure == nil {
-		return nil, nil, fmt.Errorf("infrastructure is nil")
-	}
-	if s.Infrastructure.Generators == nil {
-		return nil, nil, fmt.Errorf("infrastructure generators is nil")
-	}
-
-	gen, ok := s.Infrastructure.Generators[genName]
-	if !ok {
-		return nil, nil, fmt.Errorf("generator %q not found", genName)
-	}
-
-	inst, ok := gen.Instances[instName]
-	if !ok {
-		return nil, nil, fmt.Errorf("instance %q not found in generator %q", instName, genName)
-	}
-	return gen, inst, nil
-}
-
-func (s *State) ValidateNodeBinding() error {
-
-	if s.Inventory != nil {
-		if e := s.validateInventory(); e != nil {
-			return e
-		}
-	}
-
-	if s.Infrastructure != nil {
-		if e := s.ValidateInfrastructure(); e != nil {
-			return e
-		}
-	}
-
-	return nil
-}
-
-func (s *State) validateInventory() error {
-
-	// node -> instance
-	for nodeName, v := range s.Inventory.Nodes {
-		if v.InstanceRef == "" {
-			continue
-		}
-
-		if err := instance.ValidateInstanceRef(v.InstanceRef); err != nil {
-			return fmt.Errorf("invalid instance reference %q in node %q: %w", v.InstanceRef, nodeName, err)
-		}
-
-		genName, instName := instance.ParseInstanceRef(v.InstanceRef)
-		_, inst, err := s.findInstance(genName, instName)
-		if err != nil {
-			return err
-		}
-
-		if inst.NodeRef != nodeName {
-			return fmt.Errorf("node %q and instance %q binding mismatch: node's instanceRef=%q but instance's nodeRef=%q", nodeName, v.InstanceRef, v.InstanceRef, inst.NodeRef)
-		}
-	}
-	return nil
-}
-
-func (s *State) ValidateInfrastructure() error {
-	// instance -> node
-	for genName, v := range s.Infrastructure.Generators {
-		for instName, i := range v.Instances {
-			if i.NodeRef == "" {
-				continue
-			}
-
-			if s.Inventory == nil || s.Inventory.Nodes == nil {
-				return fmt.Errorf("node %q not found for instance %q because inventory is nil or inventory nodes are nil", i.NodeRef, instName)
-			}
-
-			node, ok := s.Inventory.Nodes[i.NodeRef]
-			if !ok {
-				return fmt.Errorf("node %q not found for instance %q", i.NodeRef, instName)
-			}
-
-			instanceRef := instance.MakeInstanceRef(genName, instName)
-			if node.InstanceRef != instanceRef {
-				return fmt.Errorf("node %q and instance %q binding mismatch: node's instanceRef=%q but instance's nodeRef=%q", i.NodeRef, instanceRef, node.InstanceRef, i.NodeRef)
-			}
-		}
-	}
-	return nil
 }
 
 func (i *Infrastructure) Validate() error {

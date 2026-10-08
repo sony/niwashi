@@ -27,17 +27,19 @@ func TestState_Validate(t *testing.T) {
 		{
 			name: "invalid node capability params",
 			state: &state.State{
-				Inventory: &state.Inventory{
-					Nodes: map[string]*node.Node{
-						"node1": {
-							Capabilities: cap.CapabilityList{
-								"cap1": &cap.Capability{
-									Params: map[string]any{
-										"invalid.name": "value", // ng
-										"invalid name": "value", // ng
-										"0":            "value", // ng
-										".":            "value", // ng
-										"a":            "value", // ok
+				Stage: state.Stage{
+					Inventory: &state.Inventory{
+						Nodes: map[string]*node.Node{
+							"node1": {
+								Capabilities: cap.CapabilityList{
+									"cap1": &cap.Capability{
+										Params: map[string]any{
+											"invalid.name": "value", // ng
+											"invalid name": "value", // ng
+											"0":            "value", // ng
+											".":            "value", // ng
+											"a":            "value", // ok
+										},
 									},
 								},
 							},
@@ -50,14 +52,16 @@ func TestState_Validate(t *testing.T) {
 		{
 			name: "invalid node capability params 2",
 			state: &state.State{
-				Inventory: &state.Inventory{
-					Nodes: map[string]*node.Node{
-						"node1": {
-							Capabilities: cap.CapabilityList{
-								"cap1": &cap.Capability{
-									Params: map[string]any{
-										"a": map[string]any{
-											"invalid.name": "value", // ng
+				Stage: state.Stage{
+					Inventory: &state.Inventory{
+						Nodes: map[string]*node.Node{
+							"node1": {
+								Capabilities: cap.CapabilityList{
+									"cap1": &cap.Capability{
+										Params: map[string]any{
+											"a": map[string]any{
+												"invalid.name": "value", // ng
+											},
 										},
 									},
 								},
@@ -71,17 +75,19 @@ func TestState_Validate(t *testing.T) {
 		{
 			name: "invalid cluster capability params",
 			state: &state.State{
-				Inventory: &state.Inventory{
-					Clusters: map[string]*cluster.Cluster{
-						"cluster1": {
-							Capabilities: cap.CapabilityList{
-								"cap1": &cap.Capability{
-									Params: map[string]any{
-										"invalid.name": "value", // ng
-										"invalid name": "value", // ng
-										"0":            "value", // ng
-										".":            "value", // ng
-										"a":            "value", // ok
+				Stage: state.Stage{
+					Inventory: &state.Inventory{
+						Clusters: map[string]*cluster.Cluster{
+							"cluster1": {
+								Capabilities: cap.CapabilityList{
+									"cap1": &cap.Capability{
+										Params: map[string]any{
+											"invalid.name": "value", // ng
+											"invalid name": "value", // ng
+											"0":            "value", // ng
+											".":            "value", // ng
+											"a":            "value", // ok
+										},
 									},
 								},
 							},
@@ -94,15 +100,17 @@ func TestState_Validate(t *testing.T) {
 		{
 			name: "invalid cluster params",
 			state: &state.State{
-				Inventory: &state.Inventory{
-					Clusters: map[string]*cluster.Cluster{
-						"cluster1": {
-							Params: map[string]any{
-								"invalid.name": "value", // ng
-								"invalid name": "value", // ng
-								"0":            "value", // ng
-								".":            "value", // ng
-								"a":            "value", // ok
+				Stage: state.Stage{
+					Inventory: &state.Inventory{
+						Clusters: map[string]*cluster.Cluster{
+							"cluster1": {
+								Params: map[string]any{
+									"invalid.name": "value", // ng
+									"invalid name": "value", // ng
+									"0":            "value", // ng
+									".":            "value", // ng
+									"a":            "value", // ok
+								},
 							},
 						},
 					},
@@ -113,16 +121,18 @@ func TestState_Validate(t *testing.T) {
 		{
 			name: "invalid generator params",
 			state: &state.State{
-				Infrastructure: &state.Infrastructure{
-					Generators: map[string]*instance.Generator{
-						"generator1": {
-							Provisioner: "dummy provisioner",
-							Params: map[string]any{
-								"invalid.name": "value", // ng
-								"invalid name": "value", // ng
-								"0":            "value", // ng
-								".":            "value", // ng
-								"a":            "value", // ok
+				Stage: state.Stage{
+					Infrastructure: &state.Infrastructure{
+						Generators: map[string]*instance.Generator{
+							"generator1": {
+								Provisioner: "dummy provisioner",
+								Params: map[string]any{
+									"invalid.name": "value", // ng
+									"invalid name": "value", // ng
+									"0":            "value", // ng
+									".":            "value", // ng
+									"a":            "value", // ok
+								},
 							},
 						},
 					},

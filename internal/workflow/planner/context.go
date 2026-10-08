@@ -93,14 +93,14 @@ func (pc *context) SetStageName(stageName string) error {
 
 	// todo: switch diff
 
-	sv, err := pc.state.Stage(stageName)
+	sv, err := pc.state.StageView(stageName)
 	if err != nil {
 		return err
 	}
 
 	var baseSv *state.StageView
 	if pc.baseState != nil {
-		baseSv, err = pc.baseState.Stage(stageName)
+		baseSv, err = pc.baseState.StageView(stageName)
 		if err != nil {
 			return err
 		}
