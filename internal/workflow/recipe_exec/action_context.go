@@ -171,13 +171,13 @@ func (b *baseActionContext) newStores(subject *Subject) map[string]types.Dict {
 
 		rs := NewRecipeSpec(r, b.Operation())
 
-		stores[req.As] = b.findStore(b.State(), subject, rs)
+		stores[req.As] = b.findStore(b.StageView(), subject, rs)
 	}
 
 	return stores
 }
 
-func (b *baseActionContext) findStore(s *state.Accessor, subject *Subject, r RecipeSpec) types.Dict {
+func (b *baseActionContext) findStore(s *state.StageView, subject *Subject, r RecipeSpec) types.Dict {
 	// host store is identified via spec.runtime, not by subject ID.
 	if r.GetKind() == recipe.KindHost {
 		return getStoreData(s, r, "")

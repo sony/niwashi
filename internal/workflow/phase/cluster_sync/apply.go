@@ -80,7 +80,7 @@ func (ct *ClusterConstructSyncTask) AfterRun(runErr error) error {
 	}
 
 	// create patches to sync cluster info
-	s := ct.ctx.TargetState()
+	s := ct.ctx.TargetStageView()
 	patches := []patch.Patch{}
 
 	for _, clusterName := range ct.Clusters {
@@ -89,7 +89,7 @@ func (ct *ClusterConstructSyncTask) AfterRun(runErr error) error {
 			return fmt.Errorf("failed to find cluster %q in target state", clusterName)
 		}
 
-		if ct.ctx.State().GetCluster(clusterName) != nil {
+		if ct.ctx.StageView().GetCluster(clusterName) != nil {
 			continue // skip if cluster already exists in current state
 		}
 
@@ -125,7 +125,7 @@ func (ct *ClusterDestructSyncTask) AfterRun(runErr error) error {
 
 	// Remove cluster info without capabilities
 	for _, clusterName := range ct.Clusters {
-		if ct.ctx.State().GetCluster(clusterName) == nil {
+		if ct.ctx.StageView().GetCluster(clusterName) == nil {
 			continue // skip if cluster does not exist in current state
 		}
 

@@ -18,8 +18,8 @@ type ApplyContext interface {
 	// Current state
 	StateManager
 
-	// Target state
-	TargetState() *state.Accessor
+	// Target StageView
+	TargetStageView() *state.StageView
 
 	// Plan
 	Plan() *plan.Plan
@@ -41,8 +41,11 @@ type ApplyContext interface {
 }
 
 type StateManager interface {
-	ApplyPatches(patches []patch.Patch, constraint patch.PathConstraint, validate func(*state.Accessor) error) error
-	State() *state.Accessor
+	ApplyPatches(
+		patches []patch.Patch,
+		constraint patch.PathConstraint,
+		validate func(*state.StageView) error) error
+	StageView() *state.StageView
 	SaveState() error
 	IsStateDirty() bool
 }

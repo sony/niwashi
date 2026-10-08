@@ -10,6 +10,7 @@ import (
 	"github.com/sony/niwashi/internal/action"
 	"github.com/sony/niwashi/internal/cmap"
 	"github.com/sony/niwashi/internal/file"
+	"github.com/sony/niwashi/internal/logger"
 	"github.com/sony/niwashi/internal/plan"
 	"github.com/sony/niwashi/internal/state"
 	"github.com/sony/niwashi/internal/workflow"
@@ -23,7 +24,7 @@ type applyContext struct {
 	finder      cmap.RecipeFinder
 	applyCfg    *Config
 	runsWs      *workspace.RunWorkspace
-	targetState *state.Accessor
+	targetState *state.State
 	buildAction func(ctx action.ActionContext) (action.Action, error)
 	operation   string
 	runContext  action.RunContext
@@ -72,7 +73,7 @@ func NewApplyContext(cfg *Config) (*applyContext, error) {
 		plan:         pln,
 		finder:       finder,
 		stateManager: stateManager,
-		targetState:  state.NewAccessor(pln.States.Target),
+		targetState:  pln.States.Target,
 		buildAction:  action.BuildAction,
 		runContext:   NewRunContext(cfg),
 		runsWs:       runsWs,
@@ -94,8 +95,18 @@ func (c *applyContext) Plan() *plan.Plan {
 	return c.plan
 }
 
-func (c *applyContext) TargetState() *state.Accessor {
+func (c *applyContext) TargetState() *state.State {
 	return c.targetState
+}
+
+func (c *applyContext) TargetStageView() *state.StageView {
+	sv, err := c.targetState.Stage(state.DefaultStageName)
+	if err != nil {
+		logger.Error("failed to create target stage view", "error", err)
+		// todo: raise error to caller or validate stage name earlier
+		return nil
+	}
+	return sv
 }
 
 func (ac *applyContext) Operation() string {

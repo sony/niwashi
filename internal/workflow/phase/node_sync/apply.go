@@ -146,7 +146,7 @@ func (s *InstanceProbeState) Satisfy() bool {
 
 func (s *InstanceProbeState) CreateProbeTasks() {
 
-	instances := GetUnprobedInstances(s.g.ctx.State())
+	instances := GetUnprobedInstances(s.g.ctx.StageView())
 	for generatorName, instanceNames := range instances {
 		for _, instanceName := range instanceNames {
 			t, err := NewNodeProbeTask(&nodeProbeTaskContext{

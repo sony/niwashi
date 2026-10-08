@@ -9,7 +9,7 @@ import (
 	"github.com/sony/niwashi/internal/state"
 )
 
-type Validator func(s *state.Accessor, target string) error
+type Validator func(s *state.StageView, target string) error
 
 type Operator interface {
 	CreatePathConstraint(RecipeSpec, string) patch.PathConstraint

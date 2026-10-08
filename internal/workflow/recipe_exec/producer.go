@@ -204,7 +204,7 @@ func (p *Producer) Finalize(task *Task) error {
 	validate := getPatchValidator(phase)
 
 	// apply patches with constraint and validation
-	err = p.recipeContext.GetApplyContext().ApplyPatches(patches, constraint, func(s *state.Accessor) error {
+	err = p.recipeContext.GetApplyContext().ApplyPatches(patches, constraint, func(s *state.StageView) error {
 		if validate == nil {
 			return nil
 		}

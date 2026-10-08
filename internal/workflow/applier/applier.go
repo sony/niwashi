@@ -34,10 +34,10 @@ func NewApplier(cfg *Config) (*Applier, error) {
 	}
 
 	// Validation
-	if err := ValidateState(ctx.RecipeFinder(), ctx.TargetState().State); err != nil {
+	if err := ValidateState(ctx.RecipeFinder(), ctx.TargetState()); err != nil {
 		return nil, err
 	}
-	if err := ValidateState(ctx.RecipeFinder(), ctx.State().State); err != nil {
+	if err := ValidateState(ctx.RecipeFinder(), ctx.State()); err != nil {
 		return nil, err
 	}
 	if err := ValidatePlan(ctx.RecipeFinder(), ctx.Plan()); err != nil {

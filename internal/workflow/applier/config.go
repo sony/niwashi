@@ -263,9 +263,7 @@ func (cfg *Config) LoadState(runsWs *workspace.RunWorkspace, pln *plan.Plan) (*s
 		opts = append(opts, WithPatchPrefix(prefix, cfg.FileSystem))
 	}
 
-	stateManager := NewStateManager(
-		state.NewAccessor(s),
-		opts...)
+	stateManager := NewStateManager(s, opts...)
 
 	return stateManager, nil
 }

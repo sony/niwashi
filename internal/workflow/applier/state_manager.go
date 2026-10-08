@@ -17,15 +17,15 @@ import (
 )
 
 type stateManager struct {
-	StateAccessor *state.Accessor
-	File          file.File
-	PatchSaver    *PatchSaver
-	dirtyState    bool
+	state      *state.State
+	File       file.File
+	PatchSaver *PatchSaver
+	dirtyState bool
 }
 
-func NewStateManager(s *state.Accessor, opt ...func(*stateManager)) *stateManager {
+func NewStateManager(s *state.State, opt ...func(*stateManager)) *stateManager {
 	sm := &stateManager{
-		StateAccessor: s,
+		state: s,
 	}
 
 	for _, opt := range opt {
@@ -57,14 +57,19 @@ func WithStateSaving(f file.File) func(*stateManager) {
 	}
 }
 
-func (sm *stateManager) State() *state.Accessor {
-	return sm.StateAccessor
+func (sm *stateManager) State() *state.State {
+	return sm.state
+}
+
+func (sm *stateManager) StageView() *state.StageView {
+	sv, _ := sm.state.Stage(state.DefaultStageName)
+	return sv
 }
 
 func (sm *stateManager) ApplyPatches(
 	patches []patch.Patch,
 	constraint patch.PathConstraint,
-	validate func(*state.Accessor) error) error {
+	validate func(*state.StageView) error) error {
 
 	if len(patches) == 0 {
 		return nil
@@ -78,25 +83,37 @@ func (sm *stateManager) ApplyPatches(
 	sm.PatchSaver.Add(patches)
 
 	// clone state first and apply patches to it
-	backupState := sm.StateAccessor.Clone()
+	backupState := sm.state.Clone()
+
+	// create stage view for applying patches
+	sv, err := backupState.Stage(state.DefaultStageName)
+	if err != nil {
+		return errors.Join(err, fmt.Errorf("failed to create stage view"))
+	}
+
 	for _, patch := range patches {
 		if err := constraint.Validate(patch.GetPath()); err != nil {
 			return errors.Join(err, fmt.Errorf("patch path does not satisfy constraint: %s", patch.GetPath()))
 		}
-		if err := patch.Apply(backupState); err != nil {
+		if err := patch.Apply(sv); err != nil {
 			return errors.Join(err, fmt.Errorf("failed to apply patch: %+v", patch))
 		}
 	}
 
-	newState := state.NewAccessor(backupState)
+	// update the backup state with the modified stage view
+	// todo: multi-stage
+	backupState.Infrastructure = sv.Infrastructure
+	backupState.Inventory = sv.Inventory
+	backupState.Runtime = sv.Runtime
+
 	if validate != nil {
-		if err := validate(newState); err != nil {
+		if err := validate(sv); err != nil {
 			return errors.Join(err, fmt.Errorf("state validation failed after applying patches"))
 		}
 	}
 
 	// replace state
-	sm.StateAccessor = newState
+	sm.state = backupState
 	sm.dirtyState = true
 	return nil
 }
@@ -124,7 +141,7 @@ func (sm *stateManager) SaveState() (err error) {
 	}
 	defer func() { err = errors.Join(err, f.Close()) }()
 
-	err = sm.StateAccessor.WriteAsJson(f)
+	err = sm.state.WriteAsJson(f)
 	if err != nil {
 		return err
 	}

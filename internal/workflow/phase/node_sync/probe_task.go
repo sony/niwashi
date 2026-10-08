@@ -41,7 +41,7 @@ func probable(c *transport.Connection) bool {
 	return true
 }
 
-func GetUnprobedInstances(s *state.Accessor) map[string][]string {
+func GetUnprobedInstances(s *state.StageView) map[string][]string {
 
 	notProbed := func(si *platform.SystemInfo) bool {
 		return si == nil || si.Os == "" || si.Arch == ""
@@ -74,7 +74,7 @@ func instanceFqidFrom(ctx NodeProbeTaskContext) string {
 func NewNodeProbeTask(ctx NodeProbeTaskContext) (*NodeProbeTask, error) {
 
 	generatorName, instanceName := ctx.GetInstanceInfo()
-	instance := ctx.GetStateManager().State().GetGenerator(generatorName).GetInstance(instanceName)
+	instance := ctx.GetStateManager().StageView().GetGenerator(generatorName).GetInstance(instanceName)
 	if instance == nil {
 		return nil, fmt.Errorf("instance not found for %s", instanceFqidFrom(ctx))
 	}
