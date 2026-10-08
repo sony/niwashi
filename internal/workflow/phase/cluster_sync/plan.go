@@ -41,7 +41,7 @@ func (p *ClusterSyncPlanner) BuildVertices(ctx planner.Context) error {
 
 	cluster_sync := []string{}
 	for _, name := range diff.Cluster {
-		c := ctx.State().GetCluster(name)
+		c := ctx.StageView().GetCluster(name)
 		if c == nil {
 			return fmt.Errorf("failed to find cluster %q in state", name)
 		}

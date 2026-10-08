@@ -61,7 +61,13 @@ func RunSshCmd(data *SshData) (err error) {
 		return err
 	}
 
-	connection, err := s.GetConnection(data.NodeName).GetTransport(ssh.TypeName)
+	// todo: Handle multiple stages if necessary
+	sv, err := s.Stage(state.DefaultStageName)
+	if err != nil {
+		return err
+	}
+
+	connection, err := sv.GetConnection(data.NodeName).GetTransport(ssh.TypeName)
 	if err != nil {
 		return fmt.Errorf("failed to get SSH transport for node: %s, error: %v", data.NodeName, err)
 	}

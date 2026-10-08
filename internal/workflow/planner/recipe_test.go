@@ -91,7 +91,10 @@ func TestRecipeDagVertex_BuildRequiresEdge_ReusesExistingVertex(t *testing.T) {
 	app := newFixtureRecipe(recipe.KindNode, "org/app", "org/lib")
 	finder := newFakeRecipeFinder(lib, app)
 
-	ctx := planner.NewContext(recipe.OperationConstruct, finder, newEmptyState(), newEmptyState(), nil, nil)
+	ctx, err := planner.NewContext(recipe.OperationConstruct, finder, newEmptyState(), newEmptyState(), nil, nil)
+	if err != nil {
+		t.Fatalf("NewContext failed: %v", err)
+	}
 
 	// Simulate BuildVertices having already added a properly-configured
 	// vertex for lib (e.g. carrying real params from the diff walk, or the
@@ -142,7 +145,10 @@ func TestRecipeDagVertex_BuildRequiresEdge_SkipsAlreadySatisfiedDependency(t *te
 		},
 	}
 
-	ctx := planner.NewContext(recipe.OperationConstruct, finder, newEmptyState(), baseState, nil, nil)
+	ctx, err := planner.NewContext(recipe.OperationConstruct, finder, newEmptyState(), baseState, nil, nil)
+	if err != nil {
+		t.Fatalf("NewContext failed: %v", err)
+	}
 
 	appVtx, err := planner.NewRecipeDagVertex(workflow.PhaseNode, "node-1", app, nil, finder, nil)
 	if err != nil {
@@ -168,7 +174,10 @@ func TestRecipeDagVertex_BuildRequiresEdge_AddsGenuinelyNewDependencyRecursively
 	app := newFixtureRecipe(recipe.KindNode, "org/app", "org/lib")
 	finder := newFakeRecipeFinder(osRecipe, lib, app)
 
-	ctx := planner.NewContext(recipe.OperationConstruct, finder, newEmptyState(), newEmptyState(), nil, nil)
+	ctx, err := planner.NewContext(recipe.OperationConstruct, finder, newEmptyState(), newEmptyState(), nil, nil)
+	if err != nil {
+		t.Fatalf("NewContext failed: %v", err)
+	}
 
 	appVtx, err := planner.NewRecipeDagVertex(workflow.PhaseNode, "node-1", app, nil, finder, nil)
 	if err != nil {

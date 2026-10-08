@@ -14,7 +14,7 @@ type InfraPlanner struct{}
 
 func (p *InfraPlanner) BuildVertices(ctx planner.Context) error {
 	diff := ctx.Diff()
-	s := ctx.State()
+	s := ctx.StageView()
 
 	for _, name := range diff.Instance {
 

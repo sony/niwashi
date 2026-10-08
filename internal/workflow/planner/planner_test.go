@@ -22,14 +22,20 @@ func TestRunPlanners(t *testing.T) {
 	finder, _ := cmap.NewCapabilityMapFrom(nil, fs, "./testdata/recipes")
 	s, _ := state.Load("./testdata/state.yaml", fs)
 
-	ctx := planner.NewContext(recipe.OperationConstruct, finder, s, nil, nil, nil)
-	err := planner.CreateGraph(ctx)
+	ctx, err := planner.NewContext(recipe.OperationConstruct, finder, s, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("NewContext failed: %v", err)
+	}
+	err = planner.CreateGraph(ctx)
 	if err != nil {
 		t.Errorf("RunPlanners failed: %v", err)
 	}
 	cg := ctx.Graph()
 
-	ctx = planner.NewContext(recipe.OperationDestruct, finder, s, nil, nil, nil)
+	ctx, err = planner.NewContext(recipe.OperationDestruct, finder, s, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("NewContext failed: %v", err)
+	}
 	err = planner.CreateGraph(ctx)
 	if err != nil {
 		t.Errorf("RunPlanners failed: %v", err)

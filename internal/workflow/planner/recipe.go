@@ -134,7 +134,7 @@ func (v *RecipeDagVertex) GetRequireVertices(ctx Context, require string) ([]*Re
 			// Case2: Cluster recipe -> Node recipe
 			// when cluster recipe depends on node recipe, add for all nodes in the cluster
 			t := v.GetTarget()
-			cluster := ctx.State().GetCluster(t)
+			cluster := ctx.StageView().GetCluster(t)
 			if cluster == nil {
 				return nil, fmt.Errorf("failed to find cluster %q in state", t)
 			}
@@ -225,7 +225,7 @@ func (v *RecipeDagVertex) isContainedIn(ctx Context) bool {
 }
 
 func (v *RecipeDagVertex) isContainedInNodeCap(ctx Context) bool {
-	baseState := ctx.BaseState()
+	baseState := ctx.BaseStageView()
 	if baseState == nil {
 		return false
 	}
@@ -245,7 +245,7 @@ func (v *RecipeDagVertex) isContainedInNodeCap(ctx Context) bool {
 }
 
 func (v *RecipeDagVertex) isContainedInClusterCap(ctx Context) bool {
-	baseState := ctx.BaseState()
+	baseState := ctx.BaseStageView()
 	if baseState == nil {
 		return false
 	}
