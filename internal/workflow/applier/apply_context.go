@@ -10,15 +10,15 @@ import (
 	"github.com/sony/niwashi/internal/action"
 	"github.com/sony/niwashi/internal/cmap"
 	"github.com/sony/niwashi/internal/file"
-	"github.com/sony/niwashi/internal/logger"
 	"github.com/sony/niwashi/internal/plan"
+	"github.com/sony/niwashi/internal/recipe"
 	"github.com/sony/niwashi/internal/state"
 	"github.com/sony/niwashi/internal/workflow"
 	"github.com/sony/niwashi/internal/workspace"
 )
 
 type applyContext struct {
-	*stateManager
+	*stageStateManager
 
 	plan        *plan.Plan
 	finder      cmap.RecipeFinder
@@ -28,6 +28,9 @@ type applyContext struct {
 	buildAction func(ctx action.ActionContext) (action.Action, error)
 	operation   string
 	runContext  action.RunContext
+
+	targetStageView *state.StageView
+	workflowGraph   *plan.Workflow
 }
 
 func NewApplyContext(cfg *Config) (*applyContext, error) {
@@ -50,6 +53,18 @@ func NewApplyContext(cfg *Config) (*applyContext, error) {
 		return nil, err
 	}
 
+	var op string
+	switch pln.Mode {
+	case plan.ModeDefault:
+		op = recipe.OperationConstruct
+	case plan.ModeDestroy:
+		op = recipe.OperationDestruct
+	case plan.ModePrune:
+		op = recipe.OperationDestruct
+	default:
+		return nil, fmt.Errorf("unsupported plan mode: %q", pln.Mode)
+	}
+
 	// Create workspace
 	runsWs, err := cfg.NewWorkspace(pln.Hash)
 	if err != nil {
@@ -69,22 +84,53 @@ func NewApplyContext(cfg *Config) (*applyContext, error) {
 	}
 
 	ctx := &applyContext{
-		applyCfg:     cfg,
-		plan:         pln,
-		finder:       finder,
-		stateManager: stateManager,
-		targetState:  pln.States.Target,
-		buildAction:  action.BuildAction,
-		runContext:   NewRunContext(cfg),
-		runsWs:       runsWs,
+		applyCfg:  cfg,
+		plan:      pln,
+		operation: op,
+		finder:    finder,
+		stageStateManager: &stageStateManager{
+			stateManager: stateManager,
+			stageName:    state.DefaultStageName,
+		},
+		targetState: pln.States.Target,
+		buildAction: action.BuildAction,
+		runContext:  NewRunContext(cfg),
+		runsWs:      runsWs,
 	}
 
 	return ctx, nil
 }
 
-func (c *applyContext) WithOperation(op string) *applyContext {
-	c.operation = op
-	return c
+func (c *applyContext) WithStage(stage string) (*applyContext, error) {
+
+	newCtx := *c
+
+	var err error
+	if _, stageExist := newCtx.targetState.FindStage(stage); stageExist {
+		newCtx.targetStageView, err = newCtx.targetState.StageView(stage)
+	} else {
+		var r *state.Runtime
+		if newCtx.targetState != nil {
+			r = newCtx.targetState.Runtime
+		}
+		newCtx.targetStageView = state.NewEmptyStageView(r)
+	}
+
+	if c.plan != nil {
+		switch c.plan.Mode {
+		case plan.ModeDefault:
+			newCtx.workflowGraph = newCtx.plan.ExecutionPlan.ConstructGraph[stage]
+		case plan.ModeDestroy, plan.ModePrune:
+			newCtx.workflowGraph = newCtx.plan.ExecutionPlan.DestructGraph[stage]
+		}
+	}
+
+	newCtx.stageStateManager = &stageStateManager{
+		stateManager: c.stateManager,
+		stageName:    stage,
+	}
+
+	return &newCtx, err
 }
 
 func (c *applyContext) RecipeFinder() cmap.RecipeFinder {
@@ -100,13 +146,7 @@ func (c *applyContext) TargetState() *state.State {
 }
 
 func (c *applyContext) TargetStageView() *state.StageView {
-	sv, err := c.targetState.StageView(state.DefaultStageName)
-	if err != nil {
-		logger.Error("failed to create target stage view", "error", err)
-		// todo: raise error to caller or validate stage name earlier
-		return nil
-	}
-	return sv
+	return c.targetStageView
 }
 
 func (ac *applyContext) Operation() string {
@@ -130,7 +170,7 @@ func (c *applyContext) FileSystem() file.FileSystem {
 }
 
 func (c *applyContext) TaskFinished(res workflow.TaskResult) error {
-	return c.saveTaskResult(c.operation, res.GetTask().GetJob(), res.GetError())
+	return c.SaveTaskResult(c.operation, res.GetTask().GetJob(), res.GetError())
 }
 
 type runContext struct {

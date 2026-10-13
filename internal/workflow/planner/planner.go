@@ -75,7 +75,78 @@ func (p *Planner) MakePlan() (*plan.Plan, error) {
 		return nil, err
 	}
 
-	planData := &plan.Plan{
+	planData := p.newPlanData()
+
+	// compute all diffs for each stage
+	diffMap, err := p.computeDiff()
+	if err != nil {
+		return nil, err
+	}
+	planData.Diff = diffMap
+
+	var operation string
+	var targetState *state.State
+	var baseState *state.State
+	swapOrder := false
+	switch p.mode {
+	case plan.ModeDefault:
+		operation = recipe.OperationConstruct
+		targetState = p.target
+		baseState = p.initial
+	case plan.ModeDestroy, plan.ModePrune:
+		operation = recipe.OperationDestruct
+		targetState = p.initial
+		baseState = nil
+		swapOrder = true
+	default:
+		return nil, fmt.Errorf("invalid plan mode: %s", p.mode)
+	}
+
+	logger.Debug("Building plan", "operation", operation)
+
+	rootCtx := NewContext(operation, p.finder)
+
+	// build DAG graph for each stage
+	stages := []string{state.MainStageName}
+	for _, stage := range stages {
+		ctx, err := rootCtx.WithStage(stage, targetState, baseState, planData.Diff)
+		if err != nil {
+			return nil, err
+		}
+
+		err = CreateGraph(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		cg := ctx.DagGraph
+		if swapOrder {
+			cg.SwapOrder()
+		}
+		wf, err := workflow.BuildWorkflow(cg)
+		if err != nil {
+			return nil, err
+		}
+
+		switch operation {
+		case recipe.OperationConstruct:
+			planData.ExecutionPlan.ConstructGraph[stage] = wf
+		case recipe.OperationDestruct:
+			planData.ExecutionPlan.DestructGraph[stage] = wf
+		}
+		planData.PendingUpdates = ctx.SkippedRecipe()
+	}
+
+	// compute hashes of referenced recipe.
+	if err = computeRecipeHash(p.finder, planData.Metadata, p.filesystem); err != nil {
+		return nil, err
+	}
+
+	return planData, nil
+}
+
+func (p *Planner) newPlanData() *plan.Plan {
+	return &plan.Plan{
 		Version: plan.Version,
 		Mode:    p.mode,
 		States: plan.States{
@@ -88,77 +159,47 @@ func (p *Planner) MakePlan() (*plan.Plan, error) {
 			Params:    p.profile.Params,
 		},
 		Metadata: plan.NewMetadata(),
+		ExecutionPlan: plan.ExecutionPlan{
+			ConstructGraph: make(map[string]*plan.Workflow),
+			DestructGraph:  make(map[string]*plan.Workflow),
+		},
 	}
+}
 
-	var diff *state.Difference
-	var updateDiff *state.Difference
-	var operation string
-	var targetState *state.State
-	var baseState *state.State
-	swapOrder := false
-	switch p.mode {
-	case plan.ModeDefault:
-		operation = recipe.OperationConstruct
+func (p *Planner) computeDiff() (map[string]*state.Diff, error) {
+	diffMap := make(map[string]*state.Diff)
 
-		// compute construct diff
-		diff = state.ComputeConstructDiff(p.initial, p.target)
-		planData.Diff.Construct = diff
+	// todo: consider handling multiple stages and merging diffs accordingly
+	stages := []string{state.MainStageName}
 
-		// compute update diff
-		updateDiff, err = state.ComputeUpdateDiff(p.initial, p.target)
-		if err != nil {
-			return nil, err
+	for _, stage := range stages {
+		diff := &state.Diff{}
+		initial, _ := p.initial.FindStage(stage)
+		target, _ := p.target.FindStage(stage)
+		switch p.mode {
+		case plan.ModeDefault:
+			// compute construct diff
+			d := state.ComputeConstructDiff(initial, target)
+			diff.Construct = d
+
+			// compute update diff
+			d, err := state.ComputeUpdateDiff(initial, target)
+			if err != nil {
+				return nil, err
+			}
+			diff.Update = d
+			diffMap[stage] = diff
+
+		case plan.ModeDestroy, plan.ModePrune:
+			d := state.ComputeDestructDiff(initial, target)
+			diff.Destruct = d
+			diffMap[stage] = diff
+		default:
+			return nil, fmt.Errorf("invalid plan mode: %s", p.mode)
 		}
-		planData.Diff.Update = updateDiff
-
-		targetState = p.target
-		baseState = p.initial
-
-	case plan.ModeDestroy, plan.ModePrune:
-		operation = recipe.OperationDestruct
-		diff = state.ComputeDestructDiff(p.initial, p.target)
-		planData.Diff.Destruct = diff
-		targetState = p.initial
-		baseState = nil
-		swapOrder = true
-	default:
-		return nil, fmt.Errorf("invalid plan mode: %s", p.mode)
 	}
 
-	logger.Debug("Building plan", "operation", operation)
-	ctx, err := NewContext(operation, p.finder, targetState, baseState, diff, updateDiff)
-	if err != nil {
-		return nil, err
-	}
-
-	err = CreateGraph(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	cg := ctx.DagGraph
-	if swapOrder {
-		cg.SwapOrder()
-	}
-	wf, err := workflow.BuildWorkflow(cg)
-	if err != nil {
-		return nil, err
-	}
-
-	switch operation {
-	case recipe.OperationConstruct:
-		planData.ExecutionPlan.ConstructGraph = wf
-	case recipe.OperationDestruct:
-		planData.ExecutionPlan.DestructGraph = wf
-	}
-	planData.PendingUpdates = ctx.SkippedRecipe()
-
-	// compute hashes of referenced recipe.
-	if err = computeRecipeHash(p.finder, planData.Metadata, p.filesystem); err != nil {
-		return nil, err
-	}
-
-	return planData, nil
+	return diffMap, nil
 }
 
 func (p *Planner) resolveTargetState() error {

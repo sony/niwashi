@@ -21,4 +21,7 @@ var (
 	ClusterIdPattern         = commonIdPattern
 	GeneratorIdPattern       = commonIdPattern
 	InstanceIdPattern        = commonIdPattern
+
+	StageNamePatternString = "[a-zA-Z][a-zA-Z0-9_]*"
+	StageNamePattern       = regexp.MustCompile("^" + StageNamePatternString + "$")
 )

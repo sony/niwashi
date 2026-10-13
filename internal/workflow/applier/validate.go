@@ -42,11 +42,15 @@ func ValidatePlan(finder cmap.RecipeFinder, pln *plan.Plan) error {
 		return nil
 	}
 
-	if err := validateWorkflow(pln.ExecutionPlan.ConstructGraph); err != nil {
-		return errors.Join(err, fmt.Errorf("invalid construct workflow in plan: %w", err))
+	for stage, wf := range pln.ExecutionPlan.ConstructGraph {
+		if err := validateWorkflow(wf); err != nil {
+			return errors.Join(err, fmt.Errorf("invalid construct workflow in plan for stage %s: %w", stage, err))
+		}
 	}
-	if err := validateWorkflow(pln.ExecutionPlan.DestructGraph); err != nil {
-		return errors.Join(err, fmt.Errorf("invalid destruct workflow in plan: %w", err))
+	for stage, wf := range pln.ExecutionPlan.DestructGraph {
+		if err := validateWorkflow(wf); err != nil {
+			return errors.Join(err, fmt.Errorf("invalid destruct workflow in plan for stage %s: %w", stage, err))
+		}
 	}
 
 	return nil

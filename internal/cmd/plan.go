@@ -150,19 +150,27 @@ func ShowPlan(p *plan.Plan) {
 	// fmt.Printf("- Recipe Directories: %v\n", p.RecipeDirs)
 	fmt.Printf("- Mode: %s\n", p.Mode)
 
-	var jobs []*plan.Job
+	var graph map[string]*plan.Workflow
 	if p.Mode == plan.ModeDefault {
-		jobs = p.ExecutionPlan.ConstructGraph.Jobs
+		graph = p.ExecutionPlan.ConstructGraph
 	} else {
-		jobs = p.ExecutionPlan.DestructGraph.Jobs
+		graph = p.ExecutionPlan.DestructGraph
 	}
-	fmt.Printf("- Total Jobs: %d\n", len(jobs))
+	fmt.Printf("- Total Jobs: %d\n", func() int {
+		count := 0
+		for _, wf := range graph {
+			count += len(wf.Jobs)
+		}
+		return count
+	}())
 	fmt.Printf("- Plan file saved at: %s\n", p.FilePath)
 	fmt.Printf("- Initial state hash: %s\n", p.States.Initial.Hash)
 
-	fmt.Printf("\nJobs:\n")
-	for i, job := range jobs {
-		fmt.Printf("%2d. %s\n", i+1, job.Id)
+	for stage, wf := range graph {
+		fmt.Printf("\n'%s' stage jobs:\n", stage)
+		for i, job := range wf.Jobs {
+			fmt.Printf("%2d. %s\n", i+1, job.Id)
+		}
 	}
 
 	if len(p.PendingUpdates) > 0 {
