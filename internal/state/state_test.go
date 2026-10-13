@@ -131,3 +131,97 @@ func TestState_Merge_Stages(t *testing.T) {
 		t.Errorf("Merge() must not modify the receiver")
 	}
 }
+
+func TestState_FindStage(t *testing.T) {
+	s := newStateWithStage(map[string]*node.Node{"gateway": {}})
+
+	t.Run("main stage", func(t *testing.T) {
+		got, ok := s.FindStage(state.MainStageName)
+		if !ok || got != &s.Stage {
+			t.Errorf("FindStage(main) = %p, %v, want the embedded stage", got, ok)
+		}
+	})
+
+	t.Run("pre-stage", func(t *testing.T) {
+		got, ok := s.FindStage("bootstrap")
+		if !ok || got != s.Stages["bootstrap"] {
+			t.Errorf("FindStage(bootstrap) = %p, %v, want the pre-stage", got, ok)
+		}
+	})
+
+	t.Run("init stage is an empty stage", func(t *testing.T) {
+		got, ok := s.FindStage(state.InitStageName)
+		if !ok || got == nil {
+			t.Fatalf("FindStage(_init) = %v, %v, want an empty stage", got, ok)
+		}
+		if got.Inventory != nil || got.Infrastructure != nil || got.Export != nil {
+			t.Errorf("FindStage(_init) = %+v, want an empty stage", got)
+		}
+	})
+
+	t.Run("unknown stage", func(t *testing.T) {
+		if got, ok := s.FindStage("unknown"); ok || got != nil {
+			t.Errorf("FindStage(unknown) = %v, %v, want nil, false", got, ok)
+		}
+	})
+
+	t.Run("nil receiver", func(t *testing.T) {
+		var ns *state.State
+		if got, ok := ns.FindStage(state.MainStageName); ok || got != nil {
+			t.Errorf("FindStage() = %v, %v, want nil, false", got, ok)
+		}
+	})
+}
+
+func TestState_StageView_InitStage(t *testing.T) {
+	s := newStateWithStage(map[string]*node.Node{"gateway": {}})
+
+	got, err := s.StageView(state.InitStageName)
+	if err != nil {
+		t.Fatalf("StageView(_init) error = %v", err)
+	}
+	if got.Inventory != nil || got.Infrastructure != nil {
+		t.Errorf("StageView(_init) = %+v, want no inventory and infrastructure", got)
+	}
+	if got.Runtime != s.Runtime {
+		t.Errorf("StageView(_init) must refer to the runtime shared by all stages")
+	}
+}
+
+func TestComputeDiff_Stage(t *testing.T) {
+	stage := &state.Stage{
+		Inventory: &state.Inventory{Nodes: map[string]*node.Node{"gateway": {}}},
+	}
+
+	t.Run("construct from nil", func(t *testing.T) {
+		d := state.ComputeConstructDiff(nil, stage)
+		if d == nil || len(d.Node) != 1 || d.Node[0] != "gateway" {
+			t.Errorf("ComputeConstructDiff() = %+v, want node gateway", d)
+		}
+	})
+
+	t.Run("destruct to nil", func(t *testing.T) {
+		d := state.ComputeDestructDiff(stage, nil)
+		if d == nil || len(d.Node) != 1 || d.Node[0] != "gateway" {
+			t.Errorf("ComputeDestructDiff() = %+v, want node gateway", d)
+		}
+	})
+
+	t.Run("no change", func(t *testing.T) {
+		if d := state.ComputeConstructDiff(stage, stage); d != nil && len(d.Node) != 0 {
+			t.Errorf("ComputeConstructDiff() = %+v, want no node", d)
+		}
+		if d := state.ComputeDestructDiff(stage, stage); d != nil && len(d.Node) != 0 {
+			t.Errorf("ComputeDestructDiff() = %+v, want no node", d)
+		}
+	})
+
+	t.Run("both nil", func(t *testing.T) {
+		if d := state.ComputeConstructDiff(nil, nil); d != nil && len(d.Node) != 0 {
+			t.Errorf("ComputeConstructDiff(nil, nil) = %+v, want no node", d)
+		}
+		if _, err := state.ComputeUpdateDiff(nil, nil); err != nil {
+			t.Errorf("ComputeUpdateDiff(nil, nil) error = %v", err)
+		}
+	})
+}

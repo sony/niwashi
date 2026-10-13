@@ -4,3 +4,8 @@ metadata:
   id: test/provisioner
   version: 1.0.0
 spec:
+  tasks:
+    - name: xxx
+      action:
+        nop: {}
+
