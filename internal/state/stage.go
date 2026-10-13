@@ -15,6 +15,10 @@ import (
 	"github.com/sony/niwashi/internal/types"
 )
 
+const InitStageName = "_init"
+const MainStageName = "main"
+const DefaultStageName = MainStageName
+
 type Stage struct {
 	Inventory      *Inventory      `json:"inventory,omitempty" yaml:"inventory,omitempty"`
 	Infrastructure *Infrastructure `json:"infrastructure,omitempty" yaml:"infrastructure,omitempty"`

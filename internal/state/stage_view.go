@@ -13,12 +13,18 @@ import (
 	"github.com/sony/niwashi/internal/transport"
 )
 
-const DefaultStageName = "main"
-
 type StageView struct {
 	Inventory      *Inventory
 	Infrastructure *Infrastructure
 	Runtime        *Runtime
+}
+
+func NewEmptyStageView(r *Runtime) *StageView {
+	return &StageView{
+		Inventory:      NewInventory(),
+		Infrastructure: &Infrastructure{},
+		Runtime:        r,
+	}
 }
 
 func (s *StageView) SetDefaults() {

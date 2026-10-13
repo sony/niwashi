@@ -13,7 +13,7 @@ import (
 	"github.com/sony/niwashi/internal/file"
 	"github.com/sony/niwashi/internal/logger"
 	"github.com/sony/niwashi/internal/plan"
-	"github.com/sony/niwashi/internal/recipe"
+	"github.com/sony/niwashi/internal/state"
 	"github.com/sony/niwashi/internal/workflow"
 	"github.com/sony/niwashi/internal/workspace"
 )
@@ -60,38 +60,45 @@ func (a *Applier) Apply() error {
 		return err
 	}
 
-	ctx := a.applyContext
+	rootCtx := a.applyContext
 
-	var op string
-	var wf *plan.Workflow
-	switch ctx.Plan().Mode {
+	switch rootCtx.Plan().Mode {
 	case plan.ModeDefault:
 		logger.Info("Applying construct plan...")
-		op = recipe.OperationConstruct
-		wf = ctx.Plan().ExecutionPlan.ConstructGraph
 	case plan.ModeDestroy:
 		logger.Info("Applying destruct plan...")
-		op = recipe.OperationDestruct
-		wf = ctx.Plan().ExecutionPlan.DestructGraph
 	case plan.ModePrune:
 		logger.Info("Applying prune plan...")
-		op = recipe.OperationDestruct
-		wf = ctx.Plan().ExecutionPlan.DestructGraph
-	default:
-		return nil
 	}
 
-	ctx = ctx.WithOperation(op)
+	// for each stage
+	stages := []string{state.InitStageName, state.MainStageName}
 
-	jobQueue := workflow.NewSingleJobQueue(wf)
+	for _, stage := range stages {
+		ctx, err := rootCtx.WithStage(stage)
+		if err != nil {
+			return err
+		}
 
-	engine := workflow.NewEngine(
-		workflow.WithMaxConcurrency(a.applyContext.applyCfg.Concurrency),
-		workflow.WithScheduler(workflow.NewTaskScheduler(ctx, jobQueue)),
-		workflow.WithListener(a),
-	)
+		if ctx.workflowGraph == nil {
+			logger.Info("No workflow:", "stage", stage)
+			continue
+		}
 
-	return engine.Run(context.Background())
+		jobQueue := workflow.NewSingleJobQueue(ctx.workflowGraph)
+
+		engine := workflow.NewEngine(
+			workflow.WithMaxConcurrency(a.applyContext.applyCfg.Concurrency),
+			workflow.WithScheduler(workflow.NewTaskScheduler(ctx, jobQueue)),
+			workflow.WithListener(a),
+		)
+
+		err = engine.Run(context.Background())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (a *Applier) OnTaskComplete(caller *workflow.Engine, res workflow.TaskResult) {

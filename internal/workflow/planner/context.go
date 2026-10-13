@@ -5,6 +5,7 @@ package planner
 
 import (
 	"github.com/sony/niwashi/internal/cmap"
+	"github.com/sony/niwashi/internal/recipe"
 	"github.com/sony/niwashi/internal/state"
 	"github.com/sony/niwashi/internal/workflow"
 )
@@ -24,37 +25,63 @@ type Context interface {
 type context struct {
 	cmap.RecipeFinder
 	*workflow.DagGraph
-	state, baseState         *state.State
+	operation string
+	initGraph *workflow.DagGraph
+
 	stageView, baseStageView *state.StageView
-	diff, updateDiff         *state.Difference
-	operation                string
+	diff, diffUpdate         *state.Difference
 	skippedRecipe            []string
 }
 
-func NewContext(
-	op string,
-	f cmap.RecipeFinder,
-	s *state.State,
-	baseState *state.State,
-	diff *state.Difference,
-	updateDiff *state.Difference) (*context, error) {
-
-	ctx := &context{
+func NewContext(op string, f cmap.RecipeFinder) *context {
+	return &context{
 		RecipeFinder: f,
 		operation:    op,
-		diff:         diff,
-		updateDiff:   updateDiff,
-		state:        s,
-		baseState:    baseState,
-		DagGraph:     workflow.NewDagGraph(),
+		initGraph:    workflow.NewDagGraph(),
+	}
+}
+
+func (pc *context) WithStage(stageName string, s, baseState *state.State, diffMap map[string]*state.Diff) (*context, error) {
+	newCtx := &context{
+		RecipeFinder: pc.RecipeFinder,
+		operation:    pc.operation,
+		initGraph:    pc.initGraph,
 	}
 
-	err := ctx.SetStageName(state.DefaultStageName)
+	// switch stage view
+	sv, err := s.StageView(stageName)
 	if err != nil {
 		return nil, err
 	}
+	var baseSv *state.StageView
+	if baseState != nil {
+		if _, exist := baseState.FindStage(stageName); exist {
+			baseSv, err = baseState.StageView(stageName)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	newCtx.stageView = sv
+	newCtx.baseStageView = baseSv
 
-	return ctx, nil
+	// switch diff
+	diffSpec, exists := diffMap[stageName]
+	if exists && diffSpec != nil {
+		if newCtx.operation == recipe.OperationDestruct {
+			newCtx.diff = diffSpec.Destruct
+			newCtx.diffUpdate = nil
+		} else {
+			newCtx.diff = diffSpec.Construct
+			newCtx.diffUpdate = diffSpec.Update
+		}
+	}
+
+	// switch graph
+	g := workflow.NewDagGraph()
+	newCtx.DagGraph = g
+
+	return newCtx, nil
 }
 
 func (pc *context) Operation() string {
@@ -74,7 +101,7 @@ func (pc *context) Diff() *state.Difference {
 }
 
 func (pc *context) UpdateDiff() *state.Difference {
-	return pc.updateDiff
+	return pc.diffUpdate
 }
 
 func (pc *context) Graph() *workflow.DagGraph {
@@ -87,25 +114,4 @@ func (pc *context) AddSkippedRecipe(phase, target, fqid string) {
 
 func (pc *context) SkippedRecipe() []string {
 	return pc.skippedRecipe
-}
-
-func (pc *context) SetStageName(stageName string) error {
-
-	// todo: switch diff
-
-	sv, err := pc.state.StageView(stageName)
-	if err != nil {
-		return err
-	}
-
-	var baseSv *state.StageView
-	if pc.baseState != nil {
-		baseSv, err = pc.baseState.StageView(stageName)
-		if err != nil {
-			return err
-		}
-	}
-	pc.stageView = sv
-	pc.baseStageView = baseSv
-	return nil
 }

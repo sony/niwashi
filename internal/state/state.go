@@ -179,19 +179,70 @@ func (s *State) ResolveParams(prof *profile.Profile) error {
 	return nil
 }
 
+func validateStageName(name string) error {
+	if !types.StageNamePattern.MatchString(name) {
+		return fmt.Errorf("invalid stage name: %s", name)
+	}
+	return nil
+}
+
+func (s *State) StageForWrite(name string) (*Stage, error) {
+	switch name {
+	case MainStageName:
+		return &s.Stage, nil
+	case InitStageName:
+		return &Stage{}, nil
+	default:
+		if err := validateStageName(name); err != nil {
+			return nil, err
+		}
+		if s.Stages == nil {
+			s.Stages = make(map[string]*Stage)
+		}
+
+		if stage, exists := s.Stages[name]; exists {
+			return stage, nil
+		}
+		stage := &Stage{}
+		stage.setDefaults()
+		s.Stages[name] = stage
+		return stage, nil
+	}
+}
+
+func (s *State) FindStage(name string) (*Stage, bool) {
+	if s == nil {
+		return nil, false
+	}
+
+	switch name {
+	case MainStageName:
+		return &s.Stage, true
+	case InitStageName:
+		return &Stage{}, true
+	default:
+		if s.Stages != nil {
+			return s.Stages.Find(name)
+		}
+	}
+
+	return nil, false
+}
+
 func (s *State) StageView(name string) (*StageView, error) {
 	if s == nil {
 		return nil, fmt.Errorf("state is nil")
 	}
 
-	if name == DefaultStageName {
-		return s.makeStageView(&s.Stage), nil
-	} else {
-		if stage, exist := s.Stages.Find(name); exist {
-			return s.makeStageView(stage), nil
-		}
+	stage, exist := s.FindStage(name)
+	if !exist {
 		return nil, fmt.Errorf("unsupported stage name: %s", name)
 	}
+	return s.makeStageView(stage), nil
+}
+
+func (s *State) MakeStageView(stage *Stage) *StageView {
+	return s.makeStageView(stage)
 }
 
 func (s *State) makeStageView(stage *Stage) *StageView {

@@ -20,21 +20,21 @@ const (
 )
 
 type Plan struct {
-	Version        string        `json:"version" yaml:"version"`
-	Metadata       *Metadata     `json:"metadata" yaml:"metadata"`
-	Mode           Mode          `json:"mode" yaml:"mode"`
-	ExecutionPlan  ExecutionPlan `json:"plan" yaml:"plan"`
-	States         States        `json:"states" yaml:"states"`
-	Diff           state.Diff    `json:"diff" yaml:"diff"`
-	Runtime        Runtime       `json:"runtime,omitempty" yaml:"runtime,omitempty"`
-	PendingUpdates []string      `json:"pendingUpdates,omitempty" yaml:"pendingUpdates,omitempty"`
-	FilePath       string        `json:"-" yaml:"-"`
-	Hash           string        `json:"-" yaml:"-"`
+	Version        string                 `json:"version" yaml:"version"`
+	Metadata       *Metadata              `json:"metadata" yaml:"metadata"`
+	Mode           Mode                   `json:"mode" yaml:"mode"`
+	ExecutionPlan  ExecutionPlan          `json:"plan" yaml:"plan"`
+	States         States                 `json:"states" yaml:"states"`
+	Diff           map[string]*state.Diff `json:"diff" yaml:"diff"`
+	Runtime        Runtime                `json:"runtime,omitempty" yaml:"runtime,omitempty"`
+	PendingUpdates []string               `json:"pendingUpdates,omitempty" yaml:"pendingUpdates,omitempty"`
+	FilePath       string                 `json:"-" yaml:"-"`
+	Hash           string                 `json:"-" yaml:"-"`
 }
 
 type ExecutionPlan struct {
-	ConstructGraph *Workflow `json:"construct,omitempty" yaml:"construct,omitempty"`
-	DestructGraph  *Workflow `json:"destruct,omitempty" yaml:"destruct,omitempty"`
+	ConstructGraph map[string]*Workflow `json:"construct,omitempty" yaml:"construct,omitempty"`
+	DestructGraph  map[string]*Workflow `json:"destruct,omitempty" yaml:"destruct,omitempty"`
 }
 
 func NewPlan() *Plan {

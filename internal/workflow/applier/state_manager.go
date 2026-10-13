@@ -61,12 +61,20 @@ func (sm *stateManager) State() *state.State {
 	return sm.state
 }
 
-func (sm *stateManager) StageView() *state.StageView {
-	sv, _ := sm.state.StageView(state.DefaultStageName)
+func (sm *stateManager) stageView(stageName string) *state.StageView {
+	sv, err := sm.state.StageView(stageName)
+	if err != nil {
+		return state.NewEmptyStageView(sm.state.Runtime)
+	}
 	return sv
 }
 
-func (sm *stateManager) ApplyPatches(
+func (sm *stateManager) StageView() *state.StageView {
+	return sm.stageView(state.DefaultStageName)
+}
+
+func (sm *stateManager) applyPatches(
+	stageName string,
 	patches []patch.Patch,
 	constraint patch.PathConstraint,
 	validate func(*state.StageView) error) error {
@@ -86,11 +94,13 @@ func (sm *stateManager) ApplyPatches(
 	backupState := sm.state.Clone()
 
 	// create stage view for applying patches
-	sv, err := backupState.StageView(state.DefaultStageName)
+	stage, err := backupState.StageForWrite(stageName)
 	if err != nil {
-		return errors.Join(err, fmt.Errorf("failed to create stage view"))
+		return errors.Join(err, fmt.Errorf("failed to get stage for write"))
 	}
+	sv := backupState.MakeStageView(stage)
 
+	// apply all patches
 	for _, patch := range patches {
 		if err := constraint.Validate(patch.GetPath()); err != nil {
 			return errors.Join(err, fmt.Errorf("patch path does not satisfy constraint: %s", patch.GetPath()))
@@ -101,9 +111,10 @@ func (sm *stateManager) ApplyPatches(
 	}
 
 	// update the backup state with the modified stage view
-	// todo: multi-stage
-	backupState.Infrastructure = sv.Infrastructure
-	backupState.Inventory = sv.Inventory
+	if stageName != state.InitStageName {
+		stage.Inventory = sv.Inventory
+		stage.Infrastructure = sv.Infrastructure
+	}
 	backupState.Runtime = sv.Runtime
 
 	if validate != nil {
@@ -116,6 +127,18 @@ func (sm *stateManager) ApplyPatches(
 	sm.state = backupState
 	sm.dirtyState = true
 	return nil
+}
+
+func (sm *stateManager) ApplyPatches(
+	patches []patch.Patch,
+	constraint patch.PathConstraint,
+	validate func(*state.StageView) error) error {
+	return sm.applyPatches(
+		state.DefaultStageName,
+		patches,
+		constraint,
+		validate,
+	)
 }
 
 func (sm *stateManager) IsStateDirty() bool {
@@ -153,15 +176,17 @@ func (sm *stateManager) SaveState() (err error) {
 
 func (sm *stateManager) saveTaskResult(
 	operation string,
+	stageName string,
 	job *workflow.Job,
 	err error) error {
 
+	id := stageName + "/" + job.Id
 	aa := &sm.State().Status.ActiveApply
 	if err != nil {
-		aa.AddErrorTask(operation, job.Id, err)
+		aa.AddErrorTask(operation, id, err)
 	} else {
 		// save completed task to state
-		aa.AddCompleteTask(operation, job.Id)
+		aa.AddCompleteTask(operation, id)
 	}
 
 	e := sm.SaveState()
@@ -171,6 +196,51 @@ func (sm *stateManager) saveTaskResult(
 	}
 
 	return e
+}
+
+func (sm *stateManager) SaveTaskResult(
+	operation string,
+	job *workflow.Job,
+	err error) error {
+	return sm.saveTaskResult(
+		operation,
+		state.DefaultStageName,
+		job,
+		err,
+	)
+}
+
+type stageStateManager struct {
+	*stateManager
+	stageName string
+}
+
+func (sm *stageStateManager) StageView() *state.StageView {
+	return sm.stageView(sm.stageName)
+}
+
+func (sm *stageStateManager) ApplyPatches(
+	patches []patch.Patch,
+	constraint patch.PathConstraint,
+	validate func(*state.StageView) error) error {
+	return sm.applyPatches(
+		sm.stageName,
+		patches,
+		constraint,
+		validate,
+	)
+}
+
+func (sm *stageStateManager) SaveTaskResult(
+	operation string,
+	job *workflow.Job,
+	err error) error {
+	return sm.saveTaskResult(
+		operation,
+		sm.stageName,
+		job,
+		err,
+	)
 }
 
 type PatchSaver struct {

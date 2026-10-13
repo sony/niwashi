@@ -6,6 +6,7 @@ package state
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/sony/niwashi/internal/cmap"
 	"github.com/sony/niwashi/internal/profile"
@@ -69,6 +70,14 @@ func (s Stages) validate() error {
 
 	var err error
 	for stageName, stage := range s {
+		// reject:
+		//  - reserved stage names
+		//  - not match the required pattern
+		if slices.Contains([]string{InitStageName, MainStageName}, stageName) {
+			err = errors.Join(err, fmt.Errorf("stage %q: reserved name", stageName))
+		} else if e := validateStageName(stageName); e != nil {
+			err = errors.Join(err, fmt.Errorf("stage %q: mismatched name pattern: %w", stageName, e))
+		}
 		if stage != nil {
 			if e := stage.validate(); e != nil {
 				err = errors.Join(err, fmt.Errorf("stage %q: %w", stageName, e))

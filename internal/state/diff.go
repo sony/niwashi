@@ -220,7 +220,7 @@ func newEmptyState() *State {
 	}
 }
 
-func normalizeForDiff(s *State) *State {
+func normalizeForDiff(s *Stage) *State {
 	ret := newEmptyState()
 	if s == nil {
 		return ret
@@ -237,7 +237,7 @@ func normalizeForDiff(s *State) *State {
 	return ret
 }
 
-func ComputeConstructDiff(initial, target *State) *Difference {
+func ComputeConstructDiff(initial, target *Stage) *Difference {
 
 	i := normalizeForDiff(initial)
 	t := normalizeForDiff(target)
@@ -245,14 +245,14 @@ func ComputeConstructDiff(initial, target *State) *Difference {
 	return newAppearanceDifference(t, i)
 }
 
-func ComputeUpdateDiff(initial, target *State) (*Difference, error) {
+func ComputeUpdateDiff(initial, target *Stage) (*Difference, error) {
 	i := normalizeForDiff(initial)
 	t := normalizeForDiff(target)
 
 	return newUpdateDifference(i, t)
 }
 
-func ComputeDestructDiff(initial, target *State) *Difference {
+func ComputeDestructDiff(initial, target *Stage) *Difference {
 
 	i := normalizeForDiff(initial)
 	t := normalizeForDiff(target)
