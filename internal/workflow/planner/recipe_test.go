@@ -97,7 +97,7 @@ func TestRecipeDagVertex_BuildRequiresEdge_ReusesExistingVertex(t *testing.T) {
 	app := newFixtureRecipe(recipe.KindNode, "org/app", "org/lib")
 	finder := newFakeRecipeFinder(lib, app)
 
-	ctx, err := planner.NewContext(recipe.OperationConstruct, finder, newEmptyState(), newEmptyState(), nil, nil)
+	ctx, err := planner.NewContext(recipe.OperationConstruct, finder).WithStage(state.MainStageName, newEmptyState(), newEmptyState(), nil)
 	if err != nil {
 		t.Fatalf("NewContext failed: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestRecipeDagVertex_BuildRequiresEdge_SkipsAlreadySatisfiedDependency(t *te
 		},
 	}
 
-	ctx, err := planner.NewContext(recipe.OperationConstruct, finder, newEmptyState(), baseState, nil, nil)
+	ctx, err := planner.NewContext(recipe.OperationConstruct, finder).WithStage(state.MainStageName, newEmptyState(), baseState, nil)
 	if err != nil {
 		t.Fatalf("NewContext failed: %v", err)
 	}
@@ -182,7 +182,7 @@ func TestRecipeDagVertex_BuildRequiresEdge_AddsGenuinelyNewDependencyRecursively
 	app := newFixtureRecipe(recipe.KindNode, "org/app", "org/lib")
 	finder := newFakeRecipeFinder(osRecipe, lib, app)
 
-	ctx, err := planner.NewContext(recipe.OperationConstruct, finder, newEmptyState(), newEmptyState(), nil, nil)
+	ctx, err := planner.NewContext(recipe.OperationConstruct, finder).WithStage(state.MainStageName, newEmptyState(), newEmptyState(), nil)
 	if err != nil {
 		t.Fatalf("NewContext failed: %v", err)
 	}

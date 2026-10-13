@@ -6,3 +6,8 @@ metadata:
 spec:
   requires:
     - test/host-tool@1.0.0
+  tasks:
+    - name: xxx
+      action:
+        nop: {}
+

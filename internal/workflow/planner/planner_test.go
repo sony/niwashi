@@ -4,7 +4,7 @@
 package planner_test
 
 import (
-	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/sony/niwashi/internal/cmap"
@@ -13,43 +13,88 @@ import (
 	"github.com/sony/niwashi/internal/state"
 	"github.com/sony/niwashi/internal/workflow"
 	"github.com/sony/niwashi/internal/workflow/planner"
+
+	// register all phases used by CreateGraph
+	_ "github.com/sony/niwashi/internal/workflow/phase/barrier"
+	_ "github.com/sony/niwashi/internal/workflow/phase/cluster"
+	_ "github.com/sony/niwashi/internal/workflow/phase/cluster_sync"
+	_ "github.com/sony/niwashi/internal/workflow/phase/host"
+	_ "github.com/sony/niwashi/internal/workflow/phase/infra"
+	_ "github.com/sony/niwashi/internal/workflow/phase/node_sync"
 )
 
-func TestRunPlanners(t *testing.T) {
+func vertexIds(g *workflow.DagGraph) []string {
+	ids := []string{}
+	for _, v := range g.GetVertices() {
+		ids = append(ids, v.GetId())
+	}
+	return ids
+}
 
+func TestRunPlanners(t *testing.T) {
+	recipe.EnableNopLoader()
 	fs := file.NewDefaultFileSystem()
 
-	finder, _ := cmap.NewCapabilityMapFrom(nil, fs, "./testdata/recipes")
-	s, _ := state.Load("./testdata/state.yaml", fs)
+	finder, err := cmap.NewCapabilityMapFrom(nil, fs, "./testdata/recipes")
+	if err != nil {
+		t.Fatalf("failed to load recipes: %v", err)
+	}
+	s, err := state.Load("./testdata/state.yaml", fs)
+	if err != nil {
+		t.Fatalf("failed to load state: %v", err)
+	}
+	if err := s.Normalize(finder); err != nil {
+		t.Fatalf("failed to normalize state: %v", err)
+	}
 
-	ctx, err := planner.NewContext(recipe.OperationConstruct, finder, s, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("NewContext failed: %v", err)
+	// vertices built from the diff of the main stage
+	wantVertices := []string{
+		"infra:test/provisioner@1.0.0:vm1",
+		"node:test/node-capability@1.0.0:node1",
+		"cluster:test/cluster-capability@1.0.0:cluster1",
 	}
-	err = planner.CreateGraph(ctx)
-	if err != nil {
-		t.Errorf("RunPlanners failed: %v", err)
-	}
-	cg := ctx.Graph()
 
-	ctx, err = planner.NewContext(recipe.OperationDestruct, finder, s, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("NewContext failed: %v", err)
+	tests := []struct {
+		name string
+		op   string
+		diff *state.Diff
+	}{
+		{
+			name: "construct",
+			op:   recipe.OperationConstruct,
+			diff: &state.Diff{Construct: state.ComputeConstructDiff(nil, &s.Stage)},
+		},
+		{
+			name: "destruct",
+			op:   recipe.OperationDestruct,
+			diff: &state.Diff{Destruct: state.ComputeDestructDiff(&s.Stage, nil)},
+		},
 	}
-	err = planner.CreateGraph(ctx)
-	if err != nil {
-		t.Errorf("RunPlanners failed: %v", err)
-	}
-	dg := ctx.Graph()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			diffMap := map[string]*state.Diff{state.MainStageName: tt.diff}
+			ctx, err := planner.NewContext(tt.op, finder).WithStage(state.MainStageName, s, nil, diffMap)
+			if err != nil {
+				t.Fatalf("WithStage() error = %v", err)
+			}
+			if err := planner.CreateGraph(ctx); err != nil {
+				t.Fatalf("CreateGraph() error = %v", err)
+			}
 
-	fmt.Printf("Construction Graph:\n%v\n", cg)
-	fmt.Printf("Destruction Graph:\n%v\n", dg)
+			ids := vertexIds(ctx.Graph())
+			for _, want := range wantVertices {
+				if !slices.Contains(ids, want) {
+					t.Errorf("vertex %q not found in graph: %v", want, ids)
+				}
+			}
 
-	wf, err := workflow.BuildWorkflow(cg)
-	if err != nil {
-		t.Errorf("BuildWorkflow failed: %v", err)
-	}
-	for i, j := range wf.Jobs {
-		fmt.Printf("Job(%d): %s\n", i, j.Id)
+			wf, err := workflow.BuildWorkflow(ctx.Graph())
+			if err != nil {
+				t.Fatalf("BuildWorkflow() error = %v", err)
+			}
+			if len(wf.Jobs) == 0 {
+				t.Errorf("BuildWorkflow() returned no jobs")
+			}
+		})
 	}
 }

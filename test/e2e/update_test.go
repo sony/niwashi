@@ -399,10 +399,13 @@ func TestUpdate_NoUpdateTasksLeavesChangePending(t *testing.T) {
 	if !slices.Contains(p.PendingUpdates, jobId) {
 		t.Errorf("plan pendingUpdates = %v, want it to contain %q", p.PendingUpdates, jobId)
 	}
-	if g := p.ExecutionPlan.ConstructGraph; g != nil {
+	for stage, g := range p.ExecutionPlan.ConstructGraph {
+		if g == nil {
+			continue
+		}
 		for _, j := range g.Jobs {
 			if j.Id == jobId {
-				t.Errorf("job %q was planned although its recipe has no update tasks", jobId)
+				t.Errorf("job %q was planned in stage %q although its recipe has no update tasks", jobId, stage)
 			}
 		}
 	}
