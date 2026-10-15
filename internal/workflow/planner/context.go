@@ -20,6 +20,7 @@ type Context interface {
 	UpdateDiff() *state.Difference
 	Graph() *workflow.DagGraph
 	AddSkippedRecipe(phase, target, fqid string)
+	InitGraph() workflow.Graph
 }
 
 type context struct {
@@ -114,4 +115,8 @@ func (pc *context) AddSkippedRecipe(phase, target, fqid string) {
 
 func (pc *context) SkippedRecipe() []string {
 	return pc.skippedRecipe
+}
+
+func (pc *context) InitGraph() workflow.Graph {
+	return pc.initGraph
 }

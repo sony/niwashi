@@ -13,7 +13,6 @@ import (
 	"github.com/sony/niwashi/internal/file"
 	"github.com/sony/niwashi/internal/logger"
 	"github.com/sony/niwashi/internal/plan"
-	"github.com/sony/niwashi/internal/state"
 	"github.com/sony/niwashi/internal/workflow"
 	"github.com/sony/niwashi/internal/workspace"
 )
@@ -49,6 +48,19 @@ func NewApplier(cfg *Config) (*Applier, error) {
 	}, nil
 }
 
+func modeName(mode plan.Mode) string {
+	switch mode {
+	case plan.ModeDefault:
+		return "construct"
+	case plan.ModeDestroy:
+		return "destroy"
+	case plan.ModePrune:
+		return "prune"
+	default:
+		return "unknown"
+	}
+}
+
 func (a *Applier) Apply() error {
 
 	// Prepare all data
@@ -62,17 +74,13 @@ func (a *Applier) Apply() error {
 
 	rootCtx := a.applyContext
 
-	switch rootCtx.Plan().Mode {
-	case plan.ModeDefault:
-		logger.Info("Applying construct plan...")
-	case plan.ModeDestroy:
-		logger.Info("Applying destruct plan...")
-	case plan.ModePrune:
-		logger.Info("Applying prune plan...")
-	}
+	logger.Info("Applying " + modeName(rootCtx.Plan().Mode) + " plan...")
 
 	// for each stage
-	stages := []string{state.InitStageName, state.MainStageName}
+	stages, err := a.applyContext.Plan().StageOrder()
+	if err != nil {
+		return err
+	}
 
 	for _, stage := range stages {
 		ctx, err := rootCtx.WithStage(stage)

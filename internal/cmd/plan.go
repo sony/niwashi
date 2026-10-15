@@ -166,7 +166,17 @@ func ShowPlan(p *plan.Plan) {
 	fmt.Printf("- Plan file saved at: %s\n", p.FilePath)
 	fmt.Printf("- Initial state hash: %s\n", p.States.Initial.Hash)
 
-	for stage, wf := range graph {
+	stages, err := p.StageOrder()
+	if err != nil {
+		fmt.Printf("failed to get stage order: %v\n", err)
+		return
+	}
+	for _, stage := range stages {
+		wf, exists := graph[stage]
+		if !exists || wf == nil || len(wf.Jobs) == 0 {
+			continue
+		}
+
 		fmt.Printf("\n'%s' stage jobs:\n", stage)
 		for i, job := range wf.Jobs {
 			fmt.Printf("%2d. %s\n", i+1, job.Id)

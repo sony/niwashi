@@ -187,23 +187,63 @@ func (v *RecipeDagVertex) BuildRequiresEdge(ctx Context) error {
 			}
 
 			for _, reqVtx := range reqVertices {
-				// no vertex exists in the current DagGraph
-				if !ctx.HasVertex(reqVtx.GetId()) {
-
-					// Recipe is already processed, so we don't need to handle it anymore.
-					if reqVtx.isContainedIn(ctx) {
-						continue
-					}
-
-					ctx.AddVertex(reqVtx)
+				if proceed, err := addVertexLink(ctx, current, reqVtx); err != nil {
+					return err
+				} else if proceed {
 					worklist = append(worklist, reqVtx)
 				}
-				ctx.AddEdge(reqVtx, current)
 			}
 		}
 	}
 
 	return nil
+}
+
+func addVertexLink(ctx Context, current *RecipeDagVertex, vertex *RecipeDagVertex) (bool, error) {
+	selfKind, err := current.GetKind()
+	if err != nil {
+		return false, err
+	}
+	targetKind, err := vertex.GetKind()
+	if err != nil {
+		return false, err
+	}
+
+	proceed := false
+
+	// host <- host: add vertex and edge to the _init graph
+	// host <- any: add vertex to the _init graph. no edge because the stage is different
+	// any <- any: add vertex and edge to the current DagGraph
+
+	if targetKind == workflow.PhaseHost {
+		g := ctx.InitGraph()
+
+		if !g.HasVertex(vertex.GetId()) {
+			g.AddVertex(vertex)
+			proceed = true
+		}
+
+		// Add edge if both are hosts
+		if selfKind == workflow.PhaseHost {
+			g.AddEdge(vertex, current)
+		}
+
+	} else {
+		// no vertex exists in the current DagGraph
+		if !ctx.HasVertex(vertex.GetId()) {
+
+			// Recipe is already processed, so we don't need to handle it anymore.
+			if vertex.isContainedIn(ctx) {
+				return false, nil
+			}
+
+			ctx.AddVertex(vertex)
+			proceed = true
+		}
+		ctx.AddEdge(vertex, current)
+	}
+
+	return proceed, nil
 }
 
 func (v *RecipeDagVertex) isContainedIn(ctx Context) bool {

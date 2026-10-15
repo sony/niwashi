@@ -252,3 +252,16 @@ func (s *State) makeStageView(stage *Stage) *StageView {
 		Runtime:        s.Runtime,
 	}
 }
+
+func (s *State) Compact() {
+	if s == nil {
+		return
+	}
+
+	// Remove empty stages from the stages
+	for name, stage := range s.Stages {
+		if stage.isEmpty() {
+			delete(s.Stages, name)
+		}
+	}
+}
