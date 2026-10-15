@@ -62,7 +62,7 @@ func TestPlanner_computeDiff(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &Planner{mode: tt.mode, initial: tt.initial, target: tt.target}
 
-			got, err := p.computeDiff()
+			got, err := p.computeDiff([]string{state.MainStageName})
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("computeDiff() error = %v, wantErr %v", err, tt.wantErr)
 			}

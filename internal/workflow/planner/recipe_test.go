@@ -401,3 +401,72 @@ func TestResolveToolAlias(t *testing.T) {
 		})
 	}
 }
+
+func TestRecipeDagVertex_BuildRequiresEdge_AddsHostVertexToInitGraph(t *testing.T) {
+	host := newFixtureRecipe(recipe.KindHost, "org/host-tool")
+	app := newFixtureRecipe(recipe.KindNode, "org/app", "org/host-tool")
+	finder := newFakeRecipeFinder(host, app)
+
+	ctx, err := planner.NewContext(recipe.OperationConstruct, finder).WithStage(state.MainStageName, newEmptyState(), newEmptyState(), nil)
+	if err != nil {
+		t.Fatalf("NewContext failed: %v", err)
+	}
+
+	appVtx, err := planner.NewRecipeDagVertex(workflow.PhaseNode, "node-1", app, nil, finder, nil)
+	if err != nil {
+		t.Fatalf("failed to build fixture vertex: %v", err)
+	}
+	ctx.AddVertex(appVtx)
+
+	if err := appVtx.BuildRequiresEdge(ctx); err != nil {
+		t.Fatalf("BuildRequiresEdge() failed: %v", err)
+	}
+
+	hostId := workflow.MakeId(workflow.PhaseHost, host.Fqid(), "")
+	initGraph := ctx.InitGraph().(*workflow.DagGraph)
+
+	if !initGraph.HasVertex(hostId) {
+		t.Errorf("expected the host vertex %q to be added to the init graph", hostId)
+	}
+	if ctx.Graph().HasVertex(hostId) {
+		t.Errorf("expected the host vertex %q not to be added to the stage graph", hostId)
+	}
+	// the host vertex runs in another stage, so no edge links it to the node vertex
+	if len(ctx.Graph().Edges) != 0 || len(initGraph.Edges) != 0 {
+		t.Errorf("expected no edges, got stage graph %v, init graph %v", ctx.Graph().Edges, initGraph.Edges)
+	}
+}
+
+func TestRecipeDagVertex_BuildRequiresEdge_SharesHostVertexAcrossStages(t *testing.T) {
+	host := newFixtureRecipe(recipe.KindHost, "org/host-tool")
+	app := newFixtureRecipe(recipe.KindNode, "org/app", "org/host-tool")
+	finder := newFakeRecipeFinder(host, app)
+
+	s := newEmptyState()
+	s.Stages = state.Stages{"bootstrap": {Inventory: &state.Inventory{Nodes: map[string]*node.Node{}}}}
+	root := planner.NewContext(recipe.OperationConstruct, finder)
+
+	initGraph := root.InitGraph().(*workflow.DagGraph)
+	for _, stage := range []string{"bootstrap", state.MainStageName} {
+		ctx, err := root.WithStage(stage, s, nil, nil)
+		if err != nil {
+			t.Fatalf("WithStage(%q) failed: %v", stage, err)
+		}
+		appVtx, err := planner.NewRecipeDagVertex(workflow.PhaseNode, "node-1", app, nil, finder, nil)
+		if err != nil {
+			t.Fatalf("failed to build fixture vertex: %v", err)
+		}
+		ctx.AddVertex(appVtx)
+		if err := appVtx.BuildRequiresEdge(ctx); err != nil {
+			t.Fatalf("BuildRequiresEdge() in stage %q failed: %v", stage, err)
+		}
+		if ctx.InitGraph() != root.InitGraph() {
+			t.Errorf("stage %q must share the init graph of the root context", stage)
+		}
+	}
+
+	hostId := workflow.MakeId(workflow.PhaseHost, host.Fqid(), "")
+	if len(initGraph.Vertices) != 1 || !initGraph.HasVertex(hostId) {
+		t.Errorf("init graph vertices = %v, want only %q", initGraph.Vertices, hostId)
+	}
+}

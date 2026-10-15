@@ -65,6 +65,8 @@ func TestValidatePlan_Stages(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pln := &plan.Plan{
+				Version: plan.Version,
+				Mode:    plan.ModeDefault,
 				ExecutionPlan: plan.ExecutionPlan{
 					ConstructGraph: tt.construct,
 					DestructGraph:  tt.destruct,

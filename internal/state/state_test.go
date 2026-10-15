@@ -6,8 +6,11 @@ package state_test
 import (
 	"testing"
 
+	"github.com/sony/niwashi/internal/cluster"
+	"github.com/sony/niwashi/internal/instance"
 	"github.com/sony/niwashi/internal/node"
 	"github.com/sony/niwashi/internal/state"
+	"github.com/sony/niwashi/internal/types"
 )
 
 // newStateWithStage returns a default State that has a pre-stage named "bootstrap".
@@ -224,4 +227,101 @@ func TestComputeDiff_Stage(t *testing.T) {
 			t.Errorf("ComputeUpdateDiff(nil, nil) error = %v", err)
 		}
 	})
+}
+
+func TestState_Compact(t *testing.T) {
+	tests := []struct {
+		name  string
+		stage *state.Stage
+		want  bool // whether the stage remains
+	}{
+		{
+			name:  "nil stage",
+			stage: nil,
+			want:  false,
+		},
+		{
+			name:  "stage without fields",
+			stage: &state.Stage{},
+			want:  false,
+		},
+		{
+			name: "stage with empty maps",
+			stage: &state.Stage{
+				Inventory: &state.Inventory{
+					Nodes:    map[string]*node.Node{},
+					Clusters: map[string]*cluster.Cluster{},
+				},
+				Infrastructure: &state.Infrastructure{
+					Generators: map[string]*instance.Generator{},
+				},
+			},
+			want: false,
+		},
+		{
+			// export refers to the nodes or clusters in the same stage
+			name:  "stage with only export",
+			stage: &state.Stage{Export: types.Dict{"x": types.Dict{"node": "gateway"}}},
+			want:  false,
+		},
+		{
+			name: "stage with a node",
+			stage: &state.Stage{
+				Inventory: &state.Inventory{Nodes: map[string]*node.Node{"gateway": {}}},
+			},
+			want: true,
+		},
+		{
+			name: "stage with a cluster",
+			stage: &state.Stage{
+				Inventory: &state.Inventory{Clusters: map[string]*cluster.Cluster{"c1": {}}},
+			},
+			want: true,
+		},
+		{
+			name: "stage with a generator",
+			stage: &state.Stage{
+				Infrastructure: &state.Infrastructure{Generators: map[string]*instance.Generator{"gw": {}}},
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := state.NewState()
+			s.Stages["bootstrap"] = tt.stage
+
+			s.Compact()
+
+			if _, got := s.Stages["bootstrap"]; got != tt.want {
+				t.Errorf("stage remains = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestState_Compact_KeepsMainStage(t *testing.T) {
+	s := newStateWithStage(map[string]*node.Node{"gateway": {}})
+	s.Stages["empty"] = &state.Stage{}
+
+	s.Compact()
+
+	if s.Inventory == nil || s.Infrastructure == nil {
+		t.Errorf("Compact() must not change the main stage: %+v", s.Stage)
+	}
+	if _, ok := s.Stages["bootstrap"]; !ok {
+		t.Errorf("Compact() must keep the non-empty stage")
+	}
+	if _, ok := s.Stages["empty"]; ok {
+		t.Errorf("Compact() must remove the empty stage")
+	}
+}
+
+func TestState_Compact_Nil(t *testing.T) {
+	var s *state.State
+	s.Compact() // must not panic
+
+	s = state.NewState()
+	s.Stages = nil
+	s.Compact() // must not panic
 }
