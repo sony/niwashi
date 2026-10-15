@@ -5,9 +5,11 @@ package applier
 
 import (
 	"errors"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/sony/niwashi/internal/file"
 	"github.com/sony/niwashi/internal/instance"
 	"github.com/sony/niwashi/internal/node"
 	"github.com/sony/niwashi/internal/patch"
@@ -183,5 +185,44 @@ func Test_stateManager_ApplyPatches_KeepsStateOnFailure(t *testing.T) {
 				t.Errorf("state must not be marked dirty on failure")
 			}
 		})
+	}
+}
+
+func Test_stateManager_SaveState_RemovesEmptyStages(t *testing.T) {
+	fs := file.NewDefaultFileSystem()
+	f := file.NewFile(filepath.Join(t.TempDir(), "state.json"), fs)
+
+	s := state.NewState()
+	s.Stages["bootstrap"] = &state.Stage{
+		Inventory: &state.Inventory{Nodes: map[string]*node.Node{"gateway": {}}},
+	}
+	// the pre-stage whose nodes are all destroyed
+	s.Stages["pruned"] = &state.Stage{
+		Inventory: &state.Inventory{Nodes: map[string]*node.Node{}},
+	}
+	s.SetDefaults()
+
+	sm := NewStateManager(s, WithStateSaving(f))
+	sm.dirtyState = true
+
+	if err := sm.SaveState(); err != nil {
+		t.Fatalf("SaveState() error = %v", err)
+	}
+
+	r, err := f.Open()
+	if err != nil {
+		t.Fatalf("failed to open the saved state: %v", err)
+	}
+	defer func() { _ = r.Close() }()
+	saved, err := state.LoadAsJson(r)
+	if err != nil {
+		t.Fatalf("failed to load the saved state: %v", err)
+	}
+
+	if _, ok := saved.Stages["pruned"]; ok {
+		t.Errorf("saved state must not have the empty stage: %v", saved.Stages)
+	}
+	if _, ok := saved.Stages["bootstrap"]; !ok {
+		t.Errorf("saved state must have the non-empty stage: %v", saved.Stages)
 	}
 }

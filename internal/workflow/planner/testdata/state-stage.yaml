@@ -1,0 +1,8 @@
+version: nws.state/v1
+stages:
+  bootstrap:
+    inventory:
+      nodes:
+        gateway:
+          capabilities:
+            - test/node-capability@1.0.0
