@@ -4,11 +4,14 @@
 package plan
 
 import (
+	"fmt"
+	"slices"
+
 	"github.com/sony/niwashi/internal/state"
 )
 
 const (
-	Version = "nws.plan/v1"
+	Version = "nws.plan/v2"
 )
 
 type Mode string
@@ -53,6 +56,78 @@ func (p *Plan) SetDefaults() {
 }
 
 func (p *Plan) Validate() error {
-	// todo: format validation
+
+	if p.Version != Version {
+		return fmt.Errorf("unsupported plan version: %s (expected: %s)", p.Version, Version)
+	}
+
+	stages, err := p.StageOrder()
+	if err != nil {
+		return err
+	}
+
+	// validate stage name in Diff
+	for stage := range p.Diff {
+		valid := false
+		for _, s := range stages {
+			if s == stage {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return fmt.Errorf("invalid stage name in Diff: %q", stage)
+		}
+	}
+
+	// validate stage name in States.Target
+	if p.States.Target != nil {
+		for stage := range p.States.Target.Stages {
+			if !slices.Contains(stages, stage) {
+				return fmt.Errorf("invalid stage name in States.Target: %q", stage)
+			}
+		}
+	}
+
 	return nil
+}
+
+func (p *Plan) StageOrder() ([]string, error) {
+	var wf map[string]*Workflow
+	var reverse bool
+
+	switch p.Mode {
+	case ModeDefault:
+		wf = p.ExecutionPlan.ConstructGraph
+	case ModeDestroy, ModePrune:
+		wf = p.ExecutionPlan.DestructGraph
+		reverse = true
+	default:
+		return nil, fmt.Errorf("unsupported plan mode: %s", p.Mode)
+	}
+
+	var customStage []string
+	for k := range wf {
+		switch k {
+		case state.InitStageName, state.MainStageName:
+		default:
+			customStage = append(customStage, k)
+		}
+	}
+
+	if len(customStage) > 1 {
+		return nil, fmt.Errorf("stage count must not exceed 1")
+	}
+
+	order := []string{}
+	order = append(order, state.InitStageName)
+	order = append(order, customStage...)
+	order = append(order, state.MainStageName)
+
+	if reverse {
+		// swap order
+		slices.Reverse(order)
+	}
+
+	return order, nil
 }

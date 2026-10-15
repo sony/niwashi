@@ -164,6 +164,9 @@ func (sm *stateManager) SaveState() (err error) {
 	}
 	defer func() { err = errors.Join(err, f.Close()) }()
 
+	// compact the state by removing empty stages
+	sm.state.Compact()
+
 	err = sm.state.WriteAsJson(f)
 	if err != nil {
 		return err

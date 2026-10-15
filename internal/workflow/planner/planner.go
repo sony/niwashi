@@ -6,7 +6,9 @@ package planner
 import (
 	"fmt"
 	"io"
+	"maps"
 	"path/filepath"
+	"slices"
 
 	"github.com/sony/niwashi/internal/cmap"
 	"github.com/sony/niwashi/internal/file"
@@ -75,10 +77,16 @@ func (p *Planner) MakePlan() (*plan.Plan, error) {
 		return nil, err
 	}
 
+	// get stage order
+	stages, err := p.StageOrder()
+	if err != nil {
+		return nil, err
+	}
+
 	planData := p.newPlanData()
 
 	// compute all diffs for each stage
-	diffMap, err := p.computeDiff()
+	diffMap, err := p.computeDiff(stages)
 	if err != nil {
 		return nil, err
 	}
@@ -106,8 +114,15 @@ func (p *Planner) MakePlan() (*plan.Plan, error) {
 
 	rootCtx := NewContext(operation, p.finder)
 
+	var g map[string]*plan.Workflow
+	switch operation {
+	case recipe.OperationConstruct:
+		g = planData.ExecutionPlan.ConstructGraph
+	case recipe.OperationDestruct:
+		g = planData.ExecutionPlan.DestructGraph
+	}
+
 	// build DAG graph for each stage
-	stages := []string{state.MainStageName}
 	for _, stage := range stages {
 		ctx, err := rootCtx.WithStage(stage, targetState, baseState, planData.Diff)
 		if err != nil {
@@ -128,14 +143,16 @@ func (p *Planner) MakePlan() (*plan.Plan, error) {
 			return nil, err
 		}
 
-		switch operation {
-		case recipe.OperationConstruct:
-			planData.ExecutionPlan.ConstructGraph[stage] = wf
-		case recipe.OperationDestruct:
-			planData.ExecutionPlan.DestructGraph[stage] = wf
-		}
-		planData.PendingUpdates = ctx.SkippedRecipe()
+		g[stage] = wf
+		planData.PendingUpdates = append(planData.PendingUpdates, ctx.SkippedRecipe()...)
 	}
+
+	// Create _init stage workflow
+	initWf, err := workflow.BuildWorkflow(rootCtx.initGraph)
+	if err != nil {
+		return nil, err
+	}
+	g[state.InitStageName] = initWf
 
 	// compute hashes of referenced recipe.
 	if err = computeRecipeHash(p.finder, planData.Metadata, p.filesystem); err != nil {
@@ -143,6 +160,26 @@ func (p *Planner) MakePlan() (*plan.Plan, error) {
 	}
 
 	return planData, nil
+}
+
+func (p *Planner) StageOrder() ([]string, error) {
+	stages := []string{}
+
+	if p.initial != nil {
+		stages = append(stages, slices.Collect(maps.Keys(p.initial.Stages))...)
+	}
+	if p.target != nil {
+		stages = append(stages, slices.Collect(maps.Keys(p.target.Stages))...)
+	}
+
+	slices.Sort(stages)
+	stages = slices.Compact(stages)
+
+	if len(stages) > 1 {
+		return nil, fmt.Errorf("multiple stages are not supported")
+	}
+
+	return append(stages, state.MainStageName), nil
 }
 
 func (p *Planner) newPlanData() *plan.Plan {
@@ -166,11 +203,8 @@ func (p *Planner) newPlanData() *plan.Plan {
 	}
 }
 
-func (p *Planner) computeDiff() (map[string]*state.Diff, error) {
+func (p *Planner) computeDiff(stages []string) (map[string]*state.Diff, error) {
 	diffMap := make(map[string]*state.Diff)
-
-	// todo: consider handling multiple stages and merging diffs accordingly
-	stages := []string{state.MainStageName}
 
 	for _, stage := range stages {
 		diff := &state.Diff{}

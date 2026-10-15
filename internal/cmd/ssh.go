@@ -18,8 +18,9 @@ import (
 )
 
 type SshData struct {
-	WorkDir  string
-	NodeName string
+	WorkDir   string
+	NodeName  string
+	StageName string
 }
 
 var sshData SshData
@@ -42,6 +43,7 @@ need to manually look up IP addresses or key paths.
 	}
 
 	cmd.Flags().StringVar(&sshData.WorkDir, FlagWorkDir, DefaultWorkDir, UsageWorkDir)
+	cmd.Flags().StringVar(&sshData.StageName, "stage", state.DefaultStageName, "Name of the stage.")
 
 	return cmd
 }
@@ -61,8 +63,7 @@ func RunSshCmd(data *SshData) (err error) {
 		return err
 	}
 
-	// todo: Handle multiple stages if necessary
-	sv, err := s.StageView(state.DefaultStageName)
+	sv, err := s.StageView(data.StageName)
 	if err != nil {
 		return err
 	}

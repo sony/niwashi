@@ -46,6 +46,24 @@ func (s *Stage) setDefaults() {
 	// }
 }
 
+func (s *Stage) isEmpty() bool {
+	if s == nil {
+		return true
+	}
+
+	if s.Inventory != nil {
+		if len(s.Inventory.Nodes) > 0 || len(s.Inventory.Clusters) > 0 {
+			return false
+		}
+	}
+	if s.Infrastructure != nil {
+		if len(s.Infrastructure.Generators) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *Stage) clone() *Stage {
 	if s == nil {
 		return nil

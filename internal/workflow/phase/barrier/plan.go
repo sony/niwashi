@@ -45,7 +45,7 @@ func (p *BarrierPlanner) BuildVertices(ctx planner.Context) error {
 
 	var before *BarrierDagVertex
 	for _, phase := range workflow.GetOrderedPhase() {
-		if phase == workflow.PhaseBarrier {
+		if phase == workflow.PhaseBarrier || phase == workflow.PhaseHost {
 			continue
 		}
 		// Add barrier vertex for the phase
