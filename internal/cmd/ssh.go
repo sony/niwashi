@@ -38,6 +38,9 @@ need to manually look up IP addresses or key paths.
 		Args:         cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			sshData.NodeName = args[0]
+			if sshData.StageName == state.InitStageName {
+				return fmt.Errorf("SSH access to the \"%s\" stage is not allowed", sshData.StageName)
+			}
 			return RunSshCmd(&sshData)
 		},
 	}
