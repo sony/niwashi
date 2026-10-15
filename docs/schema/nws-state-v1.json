@@ -4,7 +4,7 @@
   "title": "Niwashi State v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "inventory", "infrastructure"],
+  "required": ["version"],
   "properties": {
     "version": { "const": "nws.state/v1" },
 
@@ -55,10 +55,50 @@
       }
     },
 
+    "inventory": { "$ref": "#/$defs/inventory" },
+
+    "infrastructure": { "$ref": "#/$defs/infrastructure" },
+
+    "stages": {
+      "type": "object",
+      "description": "Pre-stages applied before the main stage (top-level inventory / infrastructure). Names starting with '_' are reserved for the system, and 'main' is reserved for the main stage.",
+      "propertyNames": {
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+        "not": { "const": "main" }
+      },
+      "additionalProperties": { "$ref": "#/$defs/stage" }
+    },
+
+    "runtime": {
+      "type": "object",
+      "description": "Runtime observations and execution info (updated by CLI/recipes)",
+      "additionalProperties": true,
+      "properties": {
+        "toolAliases": { "type": "object", "description": "Aliases for recipes referenceable by toolRef" },
+        "capabilityBinding": { "type": "object", "description": "Aliases for recipes referenceable as capabilities" },
+        "params": { "type": "object" },
+        "tool": {
+          "type": "object",
+          "description": "Map of tool names to tool info objects, written by kind: host installer recipes. Keys correspond to spec.runtime.name. Each value is a free-form object; by convention it includes at least a 'path' field (absolute path to the executable) and optionally a 'version' field. For tools with multiple executables, nested objects are used (e.g. { playbook: { path, version }, galaxy: { path } }).",
+          "additionalProperties": { "type": "object" }
+        }
+      }
+    }
+  },
+
+  "$defs": {
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "inventory": { "$ref": "#/$defs/inventory" },
+        "infrastructure": { "$ref": "#/$defs/infrastructure" }
+      }
+    },
+
     "inventory": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["nodes"],
       "properties": {
         "nodes": {
           "type": "object",
@@ -87,7 +127,6 @@
     "infrastructure": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["generators"],
       "properties": {
         "generators": {
           "type": "object",
@@ -102,24 +141,6 @@
       }
     },
 
-    "runtime": {
-      "type": "object",
-      "description": "Runtime observations and execution info (updated by CLI/recipes)",
-      "additionalProperties": true,
-      "properties": {
-        "toolAliases": { "type": "object", "description": "Aliases for recipes referenceable by toolRef" },
-        "capabilityBinding": { "type": "object", "description": "Aliases for recipes referenceable as capabilities" },
-        "params": { "type": "object" },
-        "tool": {
-          "type": "object",
-          "description": "Map of tool names to tool info objects, written by kind: host installer recipes. Keys correspond to spec.runtime.name. Each value is a free-form object; by convention it includes at least a 'path' field (absolute path to the executable) and optionally a 'version' field. For tools with multiple executables, nested objects are used (e.g. { playbook: { path, version }, galaxy: { path } }).",
-          "additionalProperties": { "type": "object" }
-        }
-      }
-    }
-  },
-
-  "$defs": {
     "clusterNode": {
       "type": "object",
       "additionalProperties": false,
@@ -133,6 +154,25 @@
       "additionalProperties": { "type": "string" }
     },
 
+    "capabilities": {
+      "description": "Either a sequence of recipe IDs or capability objects, or a mapping of recipe IDs to capability values",
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "type": "string", "minLength": 1 },
+              { "$ref": "#/$defs/capability" }
+            ]
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/capabilityValue" }
+        }
+      ]
+    },
+
     "capability": {
       "type": "object",
       "additionalProperties": false,
@@ -141,6 +181,16 @@
         "id": { "type": "string", "minLength": 1 },
         "version": { "type": "string" },
         "params": { "type": "object" }
+      }
+    },
+
+    "capabilityValue": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": "string" },
+        "params": { "type": "object" },
+        "store": { "type": "object", "description": "Written by recipes at apply time" }
       }
     },
 
@@ -247,40 +297,19 @@
       }
     },
 
-    "nodeCommon": {
+    "nodeTemplate": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "labels": { "$ref": "#/$defs/labels" },
-        "capabilities": {
-          "type": "array",
-          "items": {
-            "oneOf": [
-              { "$ref": "#/$defs/capability" },
-              { "type": "string" }
-            ]
-          }
-        }
-      }
-    },
-
-    "nodeTemplate": {
-      "allOf": [
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "from": {
-              "type": "string",
-              "description": "Single inheritance from another template",
-              "pattern": "^[a-zA-Z0-9._-]+$"
-            },
-            "labels": { "$ref": "#/$defs/labels" },
-            "capabilities": { "type": "array", "items": { "$ref": "#/$defs/capability" } }
-          }
+        "from": {
+          "type": "string",
+          "description": "Single inheritance from another template",
+          "pattern": "^[a-zA-Z0-9._-]+$"
         },
-        { "$ref": "#/$defs/nodeCommon" }
-      ]
+        "os": { "type": "string" },
+        "labels": { "$ref": "#/$defs/labels" },
+        "capabilities": { "$ref": "#/$defs/capabilities" }
+      }
     },
 
     "clusterTemplate": {
@@ -292,10 +321,8 @@
           "description": "Single inheritance from another template",
           "pattern": "^[a-zA-Z0-9._-]+$"
         },
-        "labels": { "$ref": "#/$defs/labels" },
         "capabilities": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/capability" },
+          "$ref": "#/$defs/capabilities",
           "description": "Cluster-scoped capability requirements only (schema validates type only)"
         },
         "version": { "type": "string" },
@@ -306,7 +333,6 @@
     "generatorTemplate": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["provisioner", "params"],
       "properties": {
         "from": {
           "type": "string",
@@ -325,7 +351,7 @@
     },
 
     "node": {
-      "type": "object",
+      "type": ["object", "null"],
       "additionalProperties": false,
       "properties": {
         "templates": {
@@ -341,15 +367,15 @@
             "generator": { "type": "string" },
             "instance": { "type": "string" }
           }
-        }
-      },
-      "allOf": [{ "$ref": "#/$defs/nodeCommon" }]
+        },
+        "labels": { "$ref": "#/$defs/labels" },
+        "capabilities": { "$ref": "#/$defs/capabilities" }
+      }
     },
 
     "cluster": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["nodes"],
       "properties": {
         "templates": {
           "type": "array",
@@ -378,8 +404,7 @@
           ]
         },
         "capabilities": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/capability" },
+          "$ref": "#/$defs/capabilities",
           "description": "Cluster-scoped capability requirements only (schema validates type only)"
         },
         "version": { "type": "string" },
