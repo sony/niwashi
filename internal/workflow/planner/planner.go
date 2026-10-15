@@ -148,7 +148,11 @@ func (p *Planner) MakePlan() (*plan.Plan, error) {
 	}
 
 	// Create _init stage workflow
-	initWf, err := workflow.BuildWorkflow(rootCtx.initGraph)
+	ig := rootCtx.initGraph
+	if swapOrder {
+		ig.SwapOrder()
+	}
+	initWf, err := workflow.BuildWorkflow(ig)
 	if err != nil {
 		return nil, err
 	}
