@@ -1,5 +1,39 @@
 # Change Log
 
+## Unreleased
+
+### Added
+
+#### State Format
+
+- Add `stages` to declare a pre-stage. A pre-stage has its own `inventory` and `infrastructure`, and is applied before the top-level (main) stage. Destroy and prune run the stages in reverse order.
+- Names of nodes, clusters and generators are scoped to their stage, so different stages can use the same names.
+- Only one pre-stage is supported. `main` and names starting with `_` are reserved.
+
+#### CLI
+
+- Add `--stage` to `nwsctl ssh` to connect to a node of a pre-stage. The default is the main stage.
+
+### Changed
+
+#### Plan Format
+
+- The plan version is now `nws.plan/v2`. `plan.construct`, `plan.destruct` and `diff` are maps keyed by stage name. `apply` fails with a plan file created by an earlier version; run `plan` again.
+
+#### CLI
+
+- Host recipes run once in the `_init` stage, before all other stages.
+- `plan` lists the jobs of each stage in execution order.
+
+### Fixed
+
+- Fix the State JSON Schema (`docs/schema/nws-state-v1.json`) rejecting valid State files, such as capabilities on nodes, capabilities written as strings or as a mapping, and files without `inventory`.
+
+### Internal
+
+- Add `StageView` to limit State operations to one stage.
+- Add e2e tests for pre-stages, and check the resulting State in `TestOffline`.
+
 ## v0.5.3 (2026-09-29)
 
 ### Added
