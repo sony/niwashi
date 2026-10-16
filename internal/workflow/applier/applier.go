@@ -88,25 +88,32 @@ func (a *Applier) Apply() error {
 			return err
 		}
 
-		if ctx.workflowGraph == nil {
-			logger.Info("No workflow:", "stage", stage)
-			continue
-		}
-
-		jobQueue := workflow.NewSingleJobQueue(ctx.workflowGraph)
-
-		engine := workflow.NewEngine(
-			workflow.WithMaxConcurrency(a.applyContext.applyCfg.Concurrency),
-			workflow.WithScheduler(workflow.NewTaskScheduler(ctx, jobQueue)),
-			workflow.WithListener(a),
-		)
-
-		err = engine.Run(context.Background())
-		if err != nil {
+		if err := runStage(ctx, stage); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func runStage(ctx *applyContext, stage string) error {
+	a := &Applier{
+		applyContext: ctx,
+	}
+
+	if ctx.workflowGraph == nil {
+		logger.Info("No workflow:", "stage", stage)
+		return nil
+	}
+
+	jobQueue := workflow.NewSingleJobQueue(ctx.workflowGraph)
+
+	engine := workflow.NewEngine(
+		workflow.WithMaxConcurrency(a.applyContext.applyCfg.Concurrency),
+		workflow.WithScheduler(workflow.NewTaskScheduler(ctx, jobQueue)),
+		workflow.WithListener(a),
+	)
+
+	return engine.Run(context.Background())
 }
 
 func (a *Applier) OnTaskComplete(caller *workflow.Engine, res workflow.TaskResult) {
