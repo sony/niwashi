@@ -1,0 +1,25 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: integ-test/stage-node
+  version: 1.0.0
+spec:
+  requires:
+    - integ-test/stage-host
+  tasks:
+    - name: construct
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "construct {{ .Target }}" >> "@MARKER_FILE@"
+      stateChanges:
+        mark:
+          op: set
+          path: "store/constructed_on"
+          value: "constructed"
+    - name: destruct
+      operation: destruct
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "destruct {{ .Target }}" >> "@MARKER_FILE@"

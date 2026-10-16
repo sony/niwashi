@@ -1,0 +1,6 @@
+version: nws.catalog/v1
+recipes:
+  stage-host:
+    path: ./stage-host.yaml
+  stage-node:
+    path: ./stage-node.yaml

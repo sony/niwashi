@@ -1,0 +1,12 @@
+version: nws.recipe/v1
+kind: host
+metadata:
+  id: integ-test/stage-host
+  version: 1.0.0
+spec:
+  tasks:
+    - name: construct
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "construct host" >> "@MARKER_FILE@"
