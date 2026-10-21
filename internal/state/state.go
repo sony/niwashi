@@ -5,6 +5,8 @@ package state
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/sony/niwashi/internal/cmap"
 	"github.com/sony/niwashi/internal/profile"
@@ -174,6 +176,95 @@ func (s *State) ResolveParams(prof *profile.Profile) error {
 		if err := s.Stages.resolveParams(prof); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func effectiveExports(target, initial *Stage) Exports {
+	var exports Exports
+	if initial != nil {
+		exports = initial.Export.Clone()
+	}
+	if target != nil {
+		if exports == nil {
+			exports = target.Export.Clone()
+		} else {
+			for k, v := range target.Export {
+				exports[k] = v.Clone()
+			}
+		}
+	}
+	return exports
+}
+
+func (s *State) ValidateExportReferences(initial *State) error {
+	if s == nil {
+		return nil
+	}
+
+	// collect all stage names
+	stageNames := map[string]struct{}{}
+	for name := range s.Stages {
+		stageNames[name] = struct{}{}
+	}
+	if initial != nil {
+		for name := range initial.Stages {
+			stageNames[name] = struct{}{}
+		}
+	}
+
+	exports := map[string]string{}
+	for _, name := range slices.Sorted(maps.Keys(stageNames)) {
+		targetStage, _ := s.FindStage(name)
+		initialStage, _ := initial.FindStage(name)
+
+		effective := effectiveExports(targetStage, initialStage)
+		if err := effective.ValidateWith(targetStage, initialStage); err != nil {
+			return fmt.Errorf("stage %q: %w", name, err)
+		}
+
+		for _, exportName := range slices.Sorted(maps.Keys(effective)) {
+			if other, exists := exports[exportName]; exists {
+				return fmt.Errorf("export %q is defined in both stage %q and stage %q", exportName, other, name)
+			}
+			exports[exportName] = name
+		}
+	}
+
+	return nil
+}
+
+func (s *State) ValidatePrunedExportReferences(initial *State) error {
+	if s == nil || initial == nil {
+		return nil
+	}
+
+	for _, name := range slices.Sorted(maps.Keys(initial.Stages)) {
+		initialStage := initial.Stages[name]
+		if initialStage == nil || initialStage.Export == nil {
+			continue
+		}
+
+		targetStage, _ := s.FindStage(name)
+
+		// the whole stage is removed by prune, so its exports need no check
+		if targetStage == nil {
+			continue
+		}
+
+		for _, exportName := range slices.Sorted(maps.Keys(initialStage.Export)) {
+			if _, exists := targetStage.Export[exportName]; !exists {
+				// the export is removed by prune, so it needs no check
+				continue
+			}
+
+			// the export remains after prune, so its source must remain too
+			if err := initialStage.Export[exportName].ValidateWith(targetStage); err != nil {
+				return fmt.Errorf("stage %q: export %q: removed by prune: %w", name, exportName, err)
+			}
+		}
+
 	}
 
 	return nil

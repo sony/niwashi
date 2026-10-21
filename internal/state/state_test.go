@@ -10,7 +10,6 @@ import (
 	"github.com/sony/niwashi/internal/instance"
 	"github.com/sony/niwashi/internal/node"
 	"github.com/sony/niwashi/internal/state"
-	"github.com/sony/niwashi/internal/types"
 )
 
 // newStateWithStage returns a default State that has a pre-stage named "bootstrap".
@@ -260,9 +259,13 @@ func TestState_Compact(t *testing.T) {
 		},
 		{
 			// export refers to the nodes or clusters in the same stage
-			name:  "stage with only export",
-			stage: &state.Stage{Export: types.Dict{"x": types.Dict{"node": "gateway"}}},
-			want:  false,
+			name: "stage with only export",
+			stage: &state.Stage{Export: state.Exports{
+				"x": &state.Export{
+					Node: "gateway",
+				},
+			}},
+			want: false,
 		},
 		{
 			name: "stage with a node",

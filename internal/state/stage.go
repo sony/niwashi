@@ -22,7 +22,7 @@ const DefaultStageName = MainStageName
 type Stage struct {
 	Inventory      *Inventory      `json:"inventory,omitempty" yaml:"inventory,omitempty"`
 	Infrastructure *Infrastructure `json:"infrastructure,omitempty" yaml:"infrastructure,omitempty"`
-	Export         types.Dict      `json:"export,omitempty" yaml:"export,omitempty"`
+	Export         Exports         `json:"export,omitempty" yaml:"export,omitempty"`
 }
 
 func (s *Stage) setDefaults() {
@@ -41,9 +41,6 @@ func (s *Stage) setDefaults() {
 	s.Inventory.SetDefaults()
 
 	// don't init Export field by default
-	// if s.Export == nil {
-	// 	s.Export = types.Dict{}
-	// }
 }
 
 func (s *Stage) isEmpty() bool {
@@ -96,7 +93,7 @@ func (s *Stage) merge(other *Stage) (*Stage, error) {
 	if err != nil {
 		return nil, err
 	}
-	clone.Export, err = types.Merge(s.Export, other.Export)
+	clone.Export, err = s.Export.Merge(other.Export)
 	if err != nil {
 		return nil, err
 	}
@@ -115,6 +112,12 @@ func (s *Stage) validate() error {
 
 	if s.Inventory != nil {
 		if e := s.Inventory.Validate(); e != nil {
+			err = errors.Join(err, e)
+		}
+	}
+
+	if s.Export != nil {
+		if e := s.Export.Validate(); e != nil {
 			err = errors.Join(err, e)
 		}
 	}
@@ -293,6 +296,13 @@ func (s *Stage) normalize(f cmap.RecipeFinder) error {
 				}
 				inst.Provisioner = recipe.Fqid()
 			}
+		}
+	}
+
+	// Normalize exports
+	if s.Export != nil {
+		if err := s.Export.Normalize(f); err != nil {
+			return err
 		}
 	}
 

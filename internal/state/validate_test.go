@@ -12,7 +12,6 @@ import (
 	"github.com/sony/niwashi/internal/instance"
 	"github.com/sony/niwashi/internal/node"
 	"github.com/sony/niwashi/internal/state"
-	"github.com/sony/niwashi/internal/types"
 )
 
 func TestState_Validate(t *testing.T) {
@@ -274,7 +273,15 @@ func TestState_Validate(t *testing.T) {
 	}
 }
 
+// TestState_Validate_Export covers only the rules State.Validate adds on top of
+// Export.Validate (see export_test.go for the checks of each export).
 func TestState_Validate_Export(t *testing.T) {
+	validExport := func() state.Exports {
+		return state.Exports{"proxy_ca_cert": &state.Export{
+			Node: "gateway", Capability: "squid.proxy", Path: "ca/cert",
+		}}
+	}
+
 	tests := []struct {
 		name    string
 		state   func() *state.State
@@ -284,7 +291,7 @@ func TestState_Validate_Export(t *testing.T) {
 			name: "export in the main stage",
 			state: func() *state.State {
 				s := state.NewState()
-				s.Export = types.Dict{"proxy_ca_cert": types.Dict{}}
+				s.Export = validExport()
 				return s
 			},
 			wantErr: true,
@@ -293,7 +300,7 @@ func TestState_Validate_Export(t *testing.T) {
 			name: "empty export in the main stage",
 			state: func() *state.State {
 				s := state.NewState()
-				s.Export = types.Dict{}
+				s.Export = state.Exports{}
 				return s
 			},
 			wantErr: true,
@@ -302,13 +309,23 @@ func TestState_Validate_Export(t *testing.T) {
 			name: "export in a pre-stage",
 			state: func() *state.State {
 				s := state.NewState()
-				s.Stages["bootstrap"] = &state.Stage{
-					Export: types.Dict{"proxy_ca_cert": types.Dict{}},
-				}
+				s.Stages["bootstrap"] = &state.Stage{Export: validExport()}
 				s.SetDefaults()
 				return s
 			},
 			wantErr: false,
+		},
+		{
+			name: "invalid export in a pre-stage",
+			state: func() *state.State {
+				s := state.NewState()
+				s.Stages["bootstrap"] = &state.Stage{
+					Export: state.Exports{"proxy_ca_cert": &state.Export{}},
+				}
+				s.SetDefaults()
+				return s
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {

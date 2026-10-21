@@ -77,6 +77,19 @@ func (p *Planner) MakePlan() (*plan.Plan, error) {
 		return nil, err
 	}
 
+	switch p.mode {
+	case plan.ModeDefault:
+		if err := p.target.ValidateExportReferences(p.initial); err != nil {
+			return nil, err
+		}
+	case plan.ModePrune:
+		if err := p.target.ValidatePrunedExportReferences(p.initial); err != nil {
+			return nil, err
+		}
+	case plan.ModeDestroy:
+		// don't validate export references
+	}
+
 	// get stage order
 	stages, err := p.StageOrder()
 	if err != nil {

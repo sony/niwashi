@@ -92,7 +92,29 @@
       "additionalProperties": false,
       "properties": {
         "inventory": { "$ref": "#/$defs/inventory" },
-        "infrastructure": { "$ref": "#/$defs/infrastructure" }
+        "infrastructure": { "$ref": "#/$defs/infrastructure" },
+        "export": {
+          "type": "object",
+          "description": "Values this stage publishes to later stages, keyed by export name. Export names must be unique across all stages.",
+          "additionalProperties": { "$ref": "#/$defs/export" }
+        }
+      }
+    },
+
+    "export": {
+      "type": "object",
+      "description": "Where the value comes from: a path in the store of a capability on a node or a cluster of the same stage. Exactly one of node and cluster is required.",
+      "additionalProperties": false,
+      "required": ["capability", "path"],
+      "oneOf": [
+        { "required": ["node"] },
+        { "required": ["cluster"] }
+      ],
+      "properties": {
+        "node": { "type": "string", "minLength": 1, "description": "Name of the source node in the same stage" },
+        "cluster": { "type": "string", "minLength": 1, "description": "Name of the source cluster in the same stage" },
+        "capability": { "type": "string", "minLength": 1, "description": "Name of the source capability as written in capabilities (recipe ID or alias). A version (FQID) is ignored with a warning." },
+        "path": { "type": "string", "minLength": 1, "description": "Path in the store of the capability, in the same notation as the relative path of stateChanges" }
       }
     },
 
