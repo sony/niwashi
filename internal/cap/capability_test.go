@@ -5,6 +5,7 @@ package cap_test
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/sony/niwashi/internal/cap"
@@ -186,6 +187,45 @@ func TestCapability_Add(t *testing.T) {
 			}
 			if !reflect.DeepEqual(tt.cap, tt.expect) {
 				t.Errorf("Add() = %v, want %v", tt.cap, tt.expect)
+			}
+		})
+	}
+}
+
+func TestCapability_Validate_Import(t *testing.T) {
+	tests := []struct {
+		name    string
+		cap     *cap.Capability
+		wantErr string // empty means no error
+	}{
+		{
+			name: "valid import",
+			cap:  &cap.Capability{Import: types.Imports{"cert": {From: "proxy_ca_cert"}}},
+		},
+		{
+			name:    "import with an empty from",
+			cap:     &cap.Capability{Import: types.Imports{"cert": {Optional: true}}},
+			wantErr: `import "cert"`,
+		},
+		{
+			name: "no import",
+			cap:  &cap.Capability{Params: types.Params{"cert": "/etc/ca.pem"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.cap.Validate()
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("Validate() error = %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("Validate() succeeded unexpectedly")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("Validate() error = %v, want %q in it", err, tt.wantErr)
 			}
 		})
 	}

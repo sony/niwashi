@@ -72,26 +72,17 @@ func NewPlanner(cfg *Config) (*Planner, error) {
 func (p *Planner) MakePlan() (*plan.Plan, error) {
 
 	// Resolve target params/env
-	err := p.resolveTargetState()
-	if err != nil {
+	if err := p.resolveTargetState(); err != nil {
 		return nil, err
 	}
 
-	switch p.mode {
-	case plan.ModeDefault:
-		if err := p.target.ValidateExportReferences(p.initial); err != nil {
-			return nil, err
-		}
-	case plan.ModePrune:
-		if err := p.target.ValidatePrunedExportReferences(p.initial); err != nil {
-			return nil, err
-		}
-	case plan.ModeDestroy:
-		// don't validate export references
+	// Validate resolved target state
+	if err := p.validateTargetState(); err != nil {
+		return nil, err
 	}
 
 	// get stage order
-	stages, err := p.StageOrder()
+	stages, err := p.stageOrder()
 	if err != nil {
 		return nil, err
 	}
@@ -127,12 +118,9 @@ func (p *Planner) MakePlan() (*plan.Plan, error) {
 
 	rootCtx := NewContext(operation, p.finder)
 
-	var g map[string]*plan.Workflow
-	switch operation {
-	case recipe.OperationConstruct:
-		g = planData.ExecutionPlan.ConstructGraph
-	case recipe.OperationDestruct:
-		g = planData.ExecutionPlan.DestructGraph
+	g, err := planData.Graph()
+	if err != nil {
+		return nil, err
 	}
 
 	// build DAG graph for each stage
@@ -179,7 +167,7 @@ func (p *Planner) MakePlan() (*plan.Plan, error) {
 	return planData, nil
 }
 
-func (p *Planner) StageOrder() ([]string, error) {
+func (p *Planner) stageOrder() ([]string, error) {
 	stages := []string{}
 
 	if p.initial != nil {
@@ -271,6 +259,35 @@ func (p *Planner) resolveTargetState() error {
 	if err := p.target.Normalize(p.finder); err != nil {
 		logger.Error("failed to normalize target state:", "error", err)
 		return err
+	}
+
+	return nil
+}
+
+func (p *Planner) validateTargetState() error {
+
+	// validate exports and imports
+	switch p.mode {
+	case plan.ModeDefault:
+		if err := p.target.ValidateExportReferences(p.initial); err != nil {
+			return err
+		}
+
+		stages, err := p.stageOrder()
+		if err != nil {
+			return err
+		}
+
+		if err := p.target.ValidateImports(stages, p.initial); err != nil {
+			return err
+		}
+
+	case plan.ModePrune:
+		if err := p.target.ValidatePrunedExportReferences(p.initial); err != nil {
+			return err
+		}
+	case plan.ModeDestroy:
+		// don't validate export references in destroy mode
 	}
 
 	return nil

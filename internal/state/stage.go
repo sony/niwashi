@@ -377,3 +377,74 @@ func (s *Stage) resolveParams(prof *profile.Profile) error {
 	}
 	return nil
 }
+
+func (s *Stage) ValidateImports(exportData Exports) error {
+	if s == nil {
+		return nil
+	}
+
+	if err := validateNodeCapImports(exportData, s); err != nil {
+		return err
+	}
+	if err := validateClusterCapImports(exportData, s); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateNodeCapImports(exportData Exports, stage *Stage) error {
+	if stage == nil || stage.Inventory == nil || stage.Inventory.Nodes == nil {
+		return nil
+	}
+
+	for name, node := range stage.Inventory.Nodes {
+		if node.Capabilities == nil {
+			continue
+		}
+
+		if err := validateCapImports(exportData, node.Capabilities); err != nil {
+			return fmt.Errorf("node %q: %w", name, err)
+		}
+	}
+
+	return nil
+}
+
+func validateClusterCapImports(exportData Exports, stage *Stage) error {
+	if stage == nil || stage.Inventory == nil || stage.Inventory.Clusters == nil {
+		return nil
+	}
+
+	for name, cluster := range stage.Inventory.Clusters {
+		if cluster.Capabilities == nil {
+			continue
+		}
+
+		if err := validateCapImports(exportData, cluster.Capabilities); err != nil {
+			return fmt.Errorf("cluster %q: %w", name, err)
+		}
+	}
+	return nil
+}
+
+func validateCapImports(exportData Exports, capList cap.CapabilityList) error {
+	for capID, c := range capList {
+		for paramsName, impt := range c.Import {
+			if impt.Optional {
+				continue
+			}
+
+			// export exists?
+			if _, exist := exportData[impt.From]; !exist {
+				return fmt.Errorf("capability %q: param %q: export %q not found in the preceding stages", capID, paramsName, impt.From)
+			}
+
+			// paramsName in "import" exists in params? this means conflict with export
+			if _, exist := c.Params.Get(paramsName); exist {
+				return fmt.Errorf("capability %q: param %q is set by both params and import (from %q)", capID, paramsName, impt.From)
+			}
+		}
+	}
+	return nil
+}

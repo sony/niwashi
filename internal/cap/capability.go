@@ -6,15 +6,18 @@ package cap
 import (
 	"errors"
 	"fmt"
+	"maps"
 
 	"github.com/sony/niwashi/internal/patch"
 	"github.com/sony/niwashi/internal/types"
 )
 
 type Capability struct {
-	Version string       `json:"version,omitempty" yaml:"version,omitempty"`
-	Params  types.Params `json:"params,omitempty" yaml:"params,omitempty"`
-	Store   types.Dict   `json:"store,omitempty" yaml:"store,omitempty"` // for runtime use, not merged or applied
+	Version  string            `json:"version,omitempty" yaml:"version,omitempty"`
+	Params   types.Params      `json:"params,omitempty" yaml:"params,omitempty"`
+	Store    types.Dict        `json:"store,omitempty" yaml:"store,omitempty"` // for runtime use, not merged or applied
+	Import   types.Imports     `json:"import,omitempty" yaml:"import,omitempty"`
+	Imported map[string]string `json:"imported,omitempty" yaml:"imported,omitempty"`
 }
 
 func (c *Capability) SearchId(id string) string {
@@ -36,6 +39,8 @@ func (c *Capability) Clone() *Capability {
 	clone.Version = c.Version
 	clone.Params = c.Params.Clone()
 	clone.Store = c.Store.Clone()
+	clone.Import = c.Import.Clone()
+	clone.Imported = maps.Clone(c.Imported)
 
 	return clone
 }
@@ -47,6 +52,10 @@ func (c *Capability) Validate() error {
 	}
 
 	if e := c.Store.ValidateAsTemplateVar(); e != nil {
+		err = errors.Join(err, e)
+	}
+
+	if e := c.Import.Validate(); e != nil {
 		err = errors.Join(err, e)
 	}
 
@@ -78,6 +87,8 @@ func (c *Capability) Merge(other *Capability) (*Capability, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	clone.Import = c.Import.Merge(other.Import)
 
 	return clone, nil
 }

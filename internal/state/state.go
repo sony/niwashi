@@ -270,6 +270,28 @@ func (s *State) ValidatePrunedExportReferences(initial *State) error {
 	return nil
 }
 
+func (s *State) ValidateImports(stageOrder []string, initialState *State) error {
+	exportData := Exports{}
+
+	for _, stageName := range stageOrder {
+		targetStage, _ := s.FindStage(stageName)
+		initialStage, _ := initialState.FindStage(stageName)
+
+		// Validate imports for the current stage
+		if err := targetStage.ValidateImports(exportData); err != nil {
+			return fmt.Errorf("stage %q: %w", stageName, err)
+		}
+
+		// Collect export data in the current stage for the next stage
+		e := effectiveExports(targetStage, initialStage)
+		for k, v := range e {
+			exportData[k] = v
+		}
+	}
+
+	return nil
+}
+
 func validateStageName(name string) error {
 	if !types.StageNamePattern.MatchString(name) {
 		return fmt.Errorf("invalid stage name: %s", name)

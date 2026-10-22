@@ -92,22 +92,43 @@ func (p *Plan) Validate() error {
 	return nil
 }
 
+func (p *Plan) Graph() (map[string]*Workflow, error) {
+	switch p.Mode {
+	case ModeDefault:
+		return p.ExecutionPlan.ConstructGraph, nil
+	case ModeDestroy, ModePrune:
+		return p.ExecutionPlan.DestructGraph, nil
+	default:
+		return nil, fmt.Errorf("unsupported plan mode: %s", p.Mode)
+	}
+}
+
 func (p *Plan) StageOrder() ([]string, error) {
-	var wf map[string]*Workflow
-	var reverse bool
+
+	order, err := p.ConstructStageOrder()
+	if err != nil {
+		return nil, err
+	}
 
 	switch p.Mode {
 	case ModeDefault:
-		wf = p.ExecutionPlan.ConstructGraph
 	case ModeDestroy, ModePrune:
-		wf = p.ExecutionPlan.DestructGraph
-		reverse = true
+		slices.Reverse(order)
 	default:
 		return nil, fmt.Errorf("unsupported plan mode: %s", p.Mode)
 	}
 
+	return order, nil
+}
+
+func (p *Plan) ConstructStageOrder() ([]string, error) {
+
 	var customStage []string
-	for k := range wf {
+	g, err := p.Graph()
+	if err != nil {
+		return nil, err
+	}
+	for k := range g {
 		switch k {
 		case state.InitStageName, state.MainStageName:
 		default:
@@ -123,11 +144,6 @@ func (p *Plan) StageOrder() ([]string, error) {
 	order = append(order, state.InitStageName)
 	order = append(order, customStage...)
 	order = append(order, state.MainStageName)
-
-	if reverse {
-		// swap order
-		slices.Reverse(order)
-	}
 
 	return order, nil
 }

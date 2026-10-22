@@ -19,9 +19,10 @@ import (
 type CapabilityList map[string]*Capability
 
 type userCapability struct {
-	Id      string       `json:"id,omitempty" yaml:"id,omitempty"`
-	Version string       `json:"version,omitempty" yaml:"version,omitempty"`
-	Params  types.Params `json:"params,omitempty" yaml:"params,omitempty"`
+	Id      string        `json:"id,omitempty" yaml:"id,omitempty"`
+	Version string        `json:"version,omitempty" yaml:"version,omitempty"`
+	Params  types.Params  `json:"params,omitempty" yaml:"params,omitempty"`
+	Import  types.Imports `json:"import,omitempty" yaml:"import,omitempty"`
 }
 
 func (c *CapabilityList) Clone() CapabilityList {
@@ -43,8 +44,7 @@ func (c *CapabilityList) Validate() error {
 		}
 		if cap == nil {
 			err = errors.Join(err, fmt.Errorf("capability cannot be nil for id: %s", id))
-		}
-		if e := cap.Validate(); e != nil {
+		} else if e := cap.Validate(); e != nil {
 			err = errors.Join(err, fmt.Errorf("capability=%q %w", id, e))
 		}
 	}
@@ -121,6 +121,7 @@ func (c *CapabilityList) UnmarshalYAML(node *yaml.Node) error {
 				(*c)[cap.Id] = &Capability{
 					Version: cap.Version,
 					Params:  cap.Params,
+					Import:  cap.Import,
 				}
 			default:
 				return fmt.Errorf("invalid capability format")
@@ -158,6 +159,7 @@ func (c *CapabilityList) Normalize(f cmap.RecipeFinder) (CapabilityList, error) 
 		nCap := Capability{
 			Version: recipe.Metadata.Version,
 			Params:  cap.Params,
+			Import:  cap.Import,
 		}
 
 		normalized[recipe.Metadata.Id] = &nCap

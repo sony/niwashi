@@ -11,7 +11,6 @@ import (
 	"github.com/sony/niwashi/internal/cap"
 	"github.com/sony/niwashi/internal/cmap"
 	"github.com/sony/niwashi/internal/logger"
-	"github.com/sony/niwashi/internal/merge"
 	"github.com/sony/niwashi/internal/recipe"
 )
 
@@ -31,14 +30,13 @@ func (e Exports) Clone() Exports {
 func (e Exports) Merge(other Exports) (Exports, error) {
 	if e == nil {
 		return other.Clone(), nil
-	}
-	if other == nil {
+	} else if other == nil {
 		return e.Clone(), nil
 	}
 
 	merged := e.Clone()
 	for k := range other {
-		merged[k] = merged[k].Merge(other[k])
+		merged[k] = other[k].Clone()
 	}
 	return merged, nil
 }
@@ -56,6 +54,7 @@ func (e Exports) Validate() error {
 	}
 	return err
 }
+
 func (e Exports) ValidateWith(stage, base *Stage) error {
 	// this should be called after normalization
 	if e == nil {
@@ -100,22 +99,6 @@ func (e *Export) Clone() *Export {
 		Cluster:    e.Cluster,
 		Capability: e.Capability,
 		Path:       e.Path,
-	}
-}
-
-func (e *Export) Merge(other *Export) *Export {
-	if e == nil {
-		return other.Clone()
-	}
-	if other == nil {
-		return e.Clone()
-	}
-
-	return &Export{
-		Node:       merge.String(e.Node, other.Node),
-		Cluster:    merge.String(e.Cluster, other.Cluster),
-		Capability: merge.String(e.Capability, other.Capability),
-		Path:       merge.String(e.Path, other.Path),
 	}
 }
 
