@@ -28,6 +28,7 @@
 ### Fixed
 
 - `plan` now validates the target State files passed with `-t`, after merging them. The files were not validated before, so an invalid State, such as an invalid or reserved stage name, an invalid node ID, or a node and an instance that do not refer to each other, was accepted. Such a State now fails with an error.
+- Fix template precedence for nodes, clusters and generators: the definition overrides its templates, and a later template overrides an earlier one.
 - Fix the State JSON Schema (`docs/schema/nws-state-v1.json`) rejecting valid State files, such as capabilities on nodes, capabilities written as strings or as a mapping, and files without `inventory`.
 
 ### Internal

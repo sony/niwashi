@@ -127,9 +127,15 @@ func (c *Cluster) ApplyTemplate(tpl map[string]*Template) error {
 		order = append(order, t2)
 	}
 
+	var combined *Template
 	for _, t := range order {
-		c.apply(t)
+		var err error
+		combined, err = combined.Merge(t)
+		if err != nil {
+			return err
+		}
 	}
+	c.apply(combined)
 
 	// clear Templates after applied
 	c.Templates = []string{}
@@ -137,16 +143,15 @@ func (c *Cluster) ApplyTemplate(tpl map[string]*Template) error {
 }
 
 func (c *Cluster) apply(tpl *Template) {
-	// merge fields from tpl into i
-	c.Version = merge.String(c.Version, tpl.Version)
 	var err error
-	c.Params, err = types.Merge(c.Params, tpl.Params)
-	if err != nil {
+
+	// merge fields from tpl into c
+	c.Version = merge.String(tpl.Version, c.Version)
+	if c.Params, err = types.Merge(tpl.Params, c.Params); err != nil {
 		// handle error if needed
 		return
 	}
-	c.Capabilities, err = c.Capabilities.Merge(tpl.Capabilities)
-	if err != nil {
+	if c.Capabilities, err = tpl.Capabilities.Merge(c.Capabilities); err != nil {
 		// handle error if needed
 		return
 	}

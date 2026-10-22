@@ -122,9 +122,15 @@ func (n *Node) ApplyTemplate(tpl map[string]*Template) error {
 		order = append(order, t2)
 	}
 
+	var combined *Template
 	for _, t := range order {
-		n.apply(t)
+		var err error
+		combined, err = combined.Merge(t)
+		if err != nil {
+			return err
+		}
 	}
+	n.apply(combined)
 
 	// clear Templates after applied
 	n.Templates = []string{}
@@ -134,7 +140,7 @@ func (n *Node) ApplyTemplate(tpl map[string]*Template) error {
 
 func (n *Node) apply(tpl *Template) {
 	// merge fields from tpl into n
-	n.Labels = merge.StringMap(n.Labels, tpl.Labels)
+	n.Labels = merge.StringMap(tpl.Labels, n.Labels)
 	caps, _ := tpl.Capabilities.Merge(n.Capabilities)
 	n.Capabilities = caps
 }

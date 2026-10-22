@@ -6,7 +6,9 @@ package instance_test
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/sony/niwashi/internal/instance"
+	"github.com/sony/niwashi/internal/types"
 )
 
 func TestGenerator_Validate(t *testing.T) {
@@ -55,4 +57,53 @@ func TestGenerator_Validate(t *testing.T) {
 			}
 		})
 	}
+}
+
+// generatorTemplates follows the example in the user guide (generators.md).
+func generatorTemplates() map[string]*instance.Template {
+	return map[string]*instance.Template{
+		"standard-vm": {
+			Provisioner: "infra.vm.driver=vagrant",
+			Params:      types.Params{"box": "ubuntu/jammy64", "cpus": 2, "memory": 2048},
+		},
+		"large-vm": {
+			Params: types.Params{"cpus": 8},
+		},
+	}
+}
+
+// TestGenerator_ApplyTemplate_Precedence follows the user guide (templates.md):
+// the definition of the generator overrides its templates, and a later
+// template overrides an earlier one.
+func TestGenerator_ApplyTemplate_Precedence(t *testing.T) {
+	g := &instance.Generator{
+		Templates: []string{"standard-vm", "large-vm"},
+		Params:    types.Params{"count": 1, "memory": 4096},
+	}
+	if err := g.ApplyTemplate(generatorTemplates()); err != nil {
+		t.Fatalf("ApplyTemplate() error = %v", err)
+	}
+
+	wantParams := types.Params{
+		"count":  1,                // only on the generator
+		"memory": 4096,             // the generator overrides the template ("Override memory only")
+		"cpus":   8,                // large-vm overrides standard-vm
+		"box":    "ubuntu/jammy64", // only in standard-vm
+	}
+	if diff := cmp.Diff(wantParams, g.Params); diff != "" {
+		t.Errorf("params mismatch (-want +got):\n%s", diff)
+	}
+	if g.Provisioner != "infra.vm.driver=vagrant" {
+		t.Errorf("provisioner = %q, want the one of the template", g.Provisioner)
+	}
+
+	t.Run("generator overrides the provisioner", func(t *testing.T) {
+		g := &instance.Generator{Templates: []string{"standard-vm"}, Provisioner: "infra.vm.driver=libvirt"}
+		if err := g.ApplyTemplate(generatorTemplates()); err != nil {
+			t.Fatalf("ApplyTemplate() error = %v", err)
+		}
+		if g.Provisioner != "infra.vm.driver=libvirt" {
+			t.Errorf("provisioner = %q, want %q", g.Provisioner, "infra.vm.driver=libvirt")
+		}
+	})
 }

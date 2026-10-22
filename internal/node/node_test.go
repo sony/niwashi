@@ -341,3 +341,52 @@ func TestNode_Validate(t *testing.T) {
 		})
 	}
 }
+
+// TestNode_ApplyTemplate_Precedence follows the user guide (templates.md): the
+// definition of the node overrides its templates, and a later template
+// overrides an earlier one.
+func TestNode_ApplyTemplate_Precedence(t *testing.T) {
+	tpl := map[string]*node.Template{
+		"template-a": {
+			Labels: map[string]string{"env": "dev", "region": "us-east", "tier": "a"},
+			Capabilities: cap.CapabilityList{
+				"org/web": {Params: types.Params{"port": 80, "user": "a", "group": "a"}},
+			},
+		},
+		"template-b": {
+			Labels: map[string]string{"env": "stg", "tier": "b"},
+			Capabilities: cap.CapabilityList{
+				"org/web": {Params: types.Params{"port": 8080, "user": "b"}},
+			},
+		},
+	}
+	n := &node.Node{
+		Templates: []string{"template-a", "template-b"},
+		Labels:    map[string]string{"env": "prod", "app": "myapp"},
+		Capabilities: cap.CapabilityList{
+			"org/web": {Params: types.Params{"port": 443}},
+		},
+	}
+	if err := n.ApplyTemplate(tpl); err != nil {
+		t.Fatalf("ApplyTemplate() error = %v", err)
+	}
+
+	wantLabels := map[string]string{
+		"env":    "prod",    // the node overrides both templates
+		"region": "us-east", // only in template-a
+		"tier":   "b",       // template-b overrides template-a
+		"app":    "myapp",   // only on the node
+	}
+	if diff := cmp.Diff(wantLabels, n.Labels); diff != "" {
+		t.Errorf("labels mismatch (-want +got):\n%s", diff)
+	}
+
+	wantParams := types.Params{
+		"port":  443, // the node overrides both templates
+		"user":  "b", // template-b overrides template-a
+		"group": "a", // only in template-a
+	}
+	if diff := cmp.Diff(wantParams, n.Capabilities["org/web"].Params); diff != "" {
+		t.Errorf("capability params mismatch (-want +got):\n%s", diff)
+	}
+}

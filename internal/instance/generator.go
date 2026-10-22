@@ -134,9 +134,16 @@ func (g *Generator) ApplyTemplate(tpl map[string]*Template) error {
 		order = append(order, t2)
 	}
 
+	var combined *Template
 	for _, t := range order {
-		g.apply(t)
+		var err error
+		combined, err = combined.Merge(t)
+		if err != nil {
+			return err
+		}
 	}
+
+	g.apply(combined)
 
 	// clear Templates after applied
 	g.Templates = []string{}
@@ -145,8 +152,8 @@ func (g *Generator) ApplyTemplate(tpl map[string]*Template) error {
 
 func (g *Generator) apply(tpl *Template) {
 	// merge fields from tpl into g
-	g.Provisioner = merge.String(g.Provisioner, tpl.Provisioner)
-	g.Params, _ = types.Merge(g.Params, tpl.Params)
+	g.Provisioner = merge.String(tpl.Provisioner, g.Provisioner)
+	g.Params, _ = types.Merge(tpl.Params, g.Params)
 }
 
 func (g *Generator) Add(path []string, value any) error {
