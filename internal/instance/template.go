@@ -10,9 +10,10 @@ import (
 )
 
 type Template struct {
-	From        string       `json:"from,omitempty" yaml:"from,omitempty"`
-	Provisioner string       `json:"provisioner,omitempty" yaml:"provisioner,omitempty"`
-	Params      types.Params `json:"params,omitempty" yaml:"params,omitempty"`
+	From        string        `json:"from,omitempty" yaml:"from,omitempty"`
+	Provisioner string        `json:"provisioner,omitempty" yaml:"provisioner,omitempty"`
+	Params      types.Params  `json:"params,omitempty" yaml:"params,omitempty"`
+	Import      types.Imports `json:"import,omitempty" yaml:"import,omitempty"`
 }
 
 func (it *Template) Clone() *Template {
@@ -23,12 +24,15 @@ func (it *Template) Clone() *Template {
 	clone.From = it.From
 	clone.Provisioner = it.Provisioner
 	clone.Params = it.Params.Clone()
+	clone.Import = it.Import.Clone()
 	return clone
 }
 
 func (it *Template) Validate() error {
-	err := it.Params.ValidateAsParams()
-	if err != nil {
+	if err := it.Params.ValidateAsParams(); err != nil {
+		return err
+	}
+	if err := it.Import.Validate(); err != nil {
 		return err
 	}
 
@@ -51,6 +55,7 @@ func (it *Template) Merge(other *Template) (*Template, error) {
 	if err != nil {
 		return nil, err
 	}
+	clone.Import = it.Import.Merge(other.Import)
 	return clone, nil
 }
 

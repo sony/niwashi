@@ -9,6 +9,7 @@ import (
 
 	"github.com/sony/niwashi/internal/cap"
 	"github.com/sony/niwashi/internal/cluster"
+	"github.com/sony/niwashi/internal/instance"
 	"github.com/sony/niwashi/internal/node"
 	"github.com/sony/niwashi/internal/state"
 	"github.com/sony/niwashi/internal/types"
@@ -30,6 +31,17 @@ func importStage(params types.Params, imports types.Imports) *state.Stage {
 		importCapId: {Params: params, Import: imports},
 	}}
 	return s
+}
+
+// generatorImportStage returns a stage whose generator "vm" has the given
+// params and imports.
+func generatorImportStage(params types.Params, imports types.Imports) *state.Stage {
+	return &state.Stage{
+		Inventory: state.NewInventory(),
+		Infrastructure: &state.Infrastructure{Generators: map[string]*instance.Generator{
+			"vm": {Provisioner: "org/vm", Params: params, Import: imports},
+		}},
+	}
 }
 
 func importOf(from string, optional bool) types.Imports {
@@ -112,6 +124,33 @@ func TestStage_ValidateImports(t *testing.T) {
 		{
 			name:    "no import",
 			stage:   importStage(types.Params{importParam: "/etc/ca.pem"}, nil),
+			exports: state.Exports{},
+		},
+		{
+			name:    "generator, export exists",
+			stage:   generatorImportStage(nil, importOf(importExportName, false)),
+			exports: importExports(),
+		},
+		{
+			name:    "generator, export not found",
+			stage:   generatorImportStage(nil, importOf(importExportName, false)),
+			exports: state.Exports{},
+			wantErr: `generator "vm": param "cert": export "proxy_ca_cert" not found`,
+		},
+		{
+			name:    "generator, param also set by params",
+			stage:   generatorImportStage(types.Params{importParam: "/etc/ca.pem"}, importOf(importExportName, false)),
+			exports: importExports(),
+			wantErr: `generator "vm": param "cert" is set by both params and import`,
+		},
+		{
+			name:    "generator, params has a key named after the export",
+			stage:   generatorImportStage(types.Params{importExportName: "/etc/ca.pem"}, importOf(importExportName, false)),
+			exports: importExports(),
+		},
+		{
+			name:    "generator, optional, export not found",
+			stage:   generatorImportStage(types.Params{importParam: "/etc/ca.pem"}, importOf(importExportName, true)),
 			exports: state.Exports{},
 		},
 		{

@@ -12,6 +12,7 @@ import (
 	"github.com/sony/niwashi/internal/cmap"
 	"github.com/sony/niwashi/internal/logger"
 	"github.com/sony/niwashi/internal/recipe"
+	"github.com/sony/niwashi/internal/types"
 )
 
 type Exports map[string]*Export
@@ -68,6 +69,25 @@ func (e Exports) ValidateWith(stage, base *Stage) error {
 		}
 	}
 	return err
+}
+
+func (e Exports) ValidateImports(params types.Params, imports types.Imports) error {
+	for paramsName, impt := range imports {
+		if impt.Optional {
+			continue
+		}
+
+		// export exists?
+		if _, exist := e[impt.From]; !exist {
+			return fmt.Errorf("param %q: export %q not found in the preceding stages", paramsName, impt.From)
+		}
+
+		// paramsName in "import" exists in params? this means conflict with export
+		if _, exist := params.Get(paramsName); exist {
+			return fmt.Errorf("param %q is set by both params and import (from %q)", paramsName, impt.From)
+		}
+	}
+	return nil
 }
 
 func (e Exports) Normalize(f cmap.RecipeFinder) error {

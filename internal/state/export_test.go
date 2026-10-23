@@ -13,6 +13,7 @@ import (
 	"github.com/sony/niwashi/internal/node"
 	"github.com/sony/niwashi/internal/recipe"
 	"github.com/sony/niwashi/internal/state"
+	"github.com/sony/niwashi/internal/types"
 )
 
 func TestExport_Validate(t *testing.T) {
@@ -795,4 +796,80 @@ func TestState_ValidatePrunedExportReferences(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestExports_ValidateImports(t *testing.T) {
+	// the param name and the export name differ so that a check looking up
+	// the wrong one fails
+	exports := state.Exports{"proxy_ca_cert": {Node: "gateway", Capability: "org/squid-proxy", Path: "ca/cert"}}
+	imports := func(from string, optional bool) types.Imports {
+		return types.Imports{"cert": {From: from, Optional: optional}}
+	}
+
+	tests := []struct {
+		name    string
+		exports state.Exports
+		params  types.Params
+		imports types.Imports
+		wantErr string // empty means no error
+	}{
+		{name: "export exists", exports: exports, imports: imports("proxy_ca_cert", false)},
+		{
+			name:    "export not found",
+			exports: exports,
+			imports: imports("proxy_endpoint", false),
+			wantErr: `param "cert": export "proxy_endpoint" not found`,
+		},
+		{
+			name:    "only an export named after the param",
+			exports: state.Exports{"cert": {Node: "gateway", Capability: "org/squid-proxy", Path: "ca/cert"}},
+			imports: imports("proxy_ca_cert", false),
+			wantErr: `export "proxy_ca_cert" not found`,
+		},
+		{name: "optional, export not found", exports: state.Exports{}, imports: imports("proxy_ca_cert", true)},
+		{
+			name:    "param also set by params",
+			exports: exports,
+			params:  types.Params{"cert": "/etc/ca.pem"},
+			imports: imports("proxy_ca_cert", false),
+			wantErr: `param "cert" is set by both params and import (from "proxy_ca_cert")`,
+		},
+		{
+			name:    "params has a key named after the export",
+			exports: exports,
+			params:  types.Params{"proxy_ca_cert": "/etc/ca.pem"},
+			imports: imports("proxy_ca_cert", false),
+		},
+		{
+			// params is the fallback for an optional import (029 3-3)
+			name:    "optional, param also set by params",
+			exports: exports,
+			params:  types.Params{"cert": "/etc/ca.pem"},
+			imports: imports("proxy_ca_cert", true),
+		},
+		{name: "no import", exports: state.Exports{}, params: types.Params{"cert": "/etc/ca.pem"}},
+		{
+			name:    "nil exports",
+			exports: nil,
+			imports: imports("proxy_ca_cert", false),
+			wantErr: `export "proxy_ca_cert" not found`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.exports.ValidateImports(tt.params, tt.imports)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("ValidateImports() error = %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("ValidateImports() succeeded unexpectedly")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("ValidateImports() error = %v, want %q in it", err, tt.wantErr)
+			}
+		})
+	}
 }

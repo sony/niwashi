@@ -389,6 +389,9 @@ func (s *Stage) ValidateImports(exportData Exports) error {
 	if err := validateClusterCapImports(exportData, s); err != nil {
 		return err
 	}
+	if err := validateGeneratorImports(exportData, s); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -430,21 +433,23 @@ func validateClusterCapImports(exportData Exports, stage *Stage) error {
 
 func validateCapImports(exportData Exports, capList cap.CapabilityList) error {
 	for capID, c := range capList {
-		for paramsName, impt := range c.Import {
-			if impt.Optional {
-				continue
-			}
-
-			// export exists?
-			if _, exist := exportData[impt.From]; !exist {
-				return fmt.Errorf("capability %q: param %q: export %q not found in the preceding stages", capID, paramsName, impt.From)
-			}
-
-			// paramsName in "import" exists in params? this means conflict with export
-			if _, exist := c.Params.Get(paramsName); exist {
-				return fmt.Errorf("capability %q: param %q is set by both params and import (from %q)", capID, paramsName, impt.From)
-			}
+		if err := exportData.ValidateImports(c.Params, c.Import); err != nil {
+			return fmt.Errorf("capability %q: %w", capID, err)
 		}
 	}
+	return nil
+}
+
+func validateGeneratorImports(exportData Exports, stage *Stage) error {
+	if stage == nil || stage.Infrastructure == nil || stage.Infrastructure.Generators == nil {
+		return nil
+	}
+
+	for name, gen := range stage.Infrastructure.Generators {
+		if err := exportData.ValidateImports(gen.Params, gen.Import); err != nil {
+			return fmt.Errorf("generator %q: %w", name, err)
+		}
+	}
+
 	return nil
 }

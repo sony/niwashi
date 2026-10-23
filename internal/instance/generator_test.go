@@ -107,3 +107,30 @@ func TestGenerator_ApplyTemplate_Precedence(t *testing.T) {
 		}
 	})
 }
+
+func TestGenerator_ApplyTemplate_Import(t *testing.T) {
+	tpl := map[string]*instance.Template{
+		"standard-vm": {
+			Provisioner: "infra.vm.driver=vagrant",
+			Import:      types.Imports{"cert": {From: "template_cert"}, "key": {From: "template_key"}},
+		},
+		"large-vm": {
+			Import: types.Imports{"key": {From: "large_key"}},
+		},
+	}
+	g := &instance.Generator{
+		Templates: []string{"standard-vm", "large-vm"},
+		Import:    types.Imports{"cert": {From: "generator_cert", Optional: true}},
+	}
+	if err := g.ApplyTemplate(tpl); err != nil {
+		t.Fatalf("ApplyTemplate() error = %v", err)
+	}
+
+	want := types.Imports{
+		"cert": {From: "generator_cert", Optional: true}, // the generator overrides the template
+		"key":  {From: "large_key"},                      // large-vm overrides standard-vm
+	}
+	if diff := cmp.Diff(want, g.Import); diff != "" {
+		t.Errorf("import mismatch (-want +got):\n%s", diff)
+	}
+}

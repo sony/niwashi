@@ -20,6 +20,7 @@ type Generator struct {
 	Params      types.Params         `json:"params,omitempty" yaml:"params,omitempty"`
 	Instances   map[string]*Instance `json:"instances,omitempty" yaml:"instances,omitempty"`
 	Store       types.Dict           `json:"store,omitempty" yaml:"store,omitempty"` // for runtime use, not merged or applied
+	Import      types.Imports        `json:"import,omitempty" yaml:"import,omitempty"`
 }
 
 func NewGenerator() *Generator {
@@ -56,14 +57,16 @@ func (g *Generator) Validate() error {
 		}
 	}
 
-	e := g.Params.ValidateAsParams()
-	if e != nil {
+	if e := g.Params.ValidateAsParams(); e != nil {
 		err = errors.Join(err, fmt.Errorf("invalid generator params: %w", e))
 	}
 
-	e = g.Store.ValidateAsTemplateVar()
-	if e != nil {
+	if e := g.Store.ValidateAsTemplateVar(); e != nil {
 		err = errors.Join(err, fmt.Errorf("invalid generator store: %w", e))
+	}
+
+	if e := g.Import.Validate(); e != nil {
+		err = errors.Join(err, fmt.Errorf("invalid generator import: %w", e))
 	}
 
 	return err
@@ -82,6 +85,7 @@ func (g *Generator) Clone() *Generator {
 		clone.Instances[k] = v.Clone()
 	}
 	clone.Store = g.Store.Clone()
+	clone.Import = g.Import.Clone()
 
 	return clone
 }
@@ -110,6 +114,8 @@ func (g *Generator) Merge(other *Generator) (*Generator, error) {
 	if err != nil {
 		return nil, err
 	}
+	clone.Import = g.Import.Merge(other.Import)
+
 	return clone, nil
 }
 
@@ -154,6 +160,7 @@ func (g *Generator) apply(tpl *Template) {
 	// merge fields from tpl into g
 	g.Provisioner = merge.String(tpl.Provisioner, g.Provisioner)
 	g.Params, _ = types.Merge(tpl.Params, g.Params)
+	g.Import = tpl.Import.Merge(g.Import)
 }
 
 func (g *Generator) Add(path []string, value any) error {
