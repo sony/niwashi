@@ -4,7 +4,9 @@
 package recipe_exec
 
 import (
+	"encoding/json"
 	"fmt"
+	"maps"
 
 	"github.com/sony/niwashi/internal/file"
 	"github.com/sony/niwashi/internal/logger"
@@ -30,6 +32,7 @@ type RecipeContext interface {
 	GetStateFileName() string
 	GetRecipe() RecipeSpec
 	GetStoreData() map[string]any
+	GetUserParams() map[string]any
 }
 
 type TaskGenerator interface {
@@ -54,6 +57,7 @@ type taskGenerator struct {
 	stateMachine      *workflow.StateMachine
 	runState          *runState
 	operation         string
+	params            map[string]any
 }
 
 func (g *taskGenerator) GetApplyContext() workflow.ApplyContext {
@@ -70,6 +74,10 @@ func (g *taskGenerator) GetJob() *workflow.Job {
 
 func (g *taskGenerator) GetRunState() RunState {
 	return g.runState
+}
+
+func (g *taskGenerator) GetUserParams() map[string]any {
+	return g.params
 }
 
 func (g *taskGenerator) GetOperation() string {
@@ -207,6 +215,12 @@ func _newRecipeTaskGenerator(ctx workflow.ApplyContext, job *workflow.Job) (*tas
 		return nil, err
 	}
 
+	// todo: keep imported data in next commit
+	params, _, err := createUserParams(job, ctx.GetExportValues())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user params: %s", err)
+	}
+
 	op := ctx.Operation()
 	if update, ok := job.GetFromData("update"); ok {
 		if updateBool, ok := update.(bool); ok && updateBool {
@@ -233,6 +247,7 @@ func _newRecipeTaskGenerator(ctx workflow.ApplyContext, job *workflow.Job) (*tas
 		recipeWs:     recipeWs,
 		producers:    make(map[string]*Producer),
 		dirtyState:   true, // mark dirty to create runtime state in the first GetRuntimeState call
+		params:       params,
 	}
 
 	gen.stateMachine.AddTransitions(map[int]int{
@@ -298,6 +313,63 @@ func parseOptions(job *workflow.Job) (fqid string, phase string, target string) 
 	phase = job.GetPhase()
 
 	return fqid, phase, target
+}
+
+func createUserParams(job *workflow.Job, exportValues map[string]any) (map[string]any, map[string]any, error) {
+	params := map[string]any{}
+	imported := map[string]any{}
+
+	d := job.Data
+	if d == nil {
+		return params, imported, nil
+	}
+
+	// "data" field in workflow.Job as params, which includes the followings:
+	//    - params in profile by user
+	//    - params in capability by user
+	// These compositions are done in plan phase.
+	if data, found := d.(map[string]any)["params"]; found {
+		params = maps.Clone(data.(map[string]any))
+	}
+
+	// resolve import data
+	if i, found := d.(map[string]any)["import"]; found {
+		// any to types.Imports
+		jsonBytes, err := json.Marshal(i)
+		if err != nil {
+			return nil, nil, err
+		}
+		var imp types.Imports
+		if err := json.Unmarshal(jsonBytes, &imp); err != nil {
+			return nil, nil, err
+		}
+
+		for k, v := range imp {
+			// `optional:false` & params[key] exists -> error
+			if !v.Optional {
+				if _, exist := params[k]; exist {
+					return nil, nil, fmt.Errorf(
+						"param %q is set by both params and import (from %q); the plan may have been modified after nwsctl plan",
+						k, v.From)
+				}
+			}
+
+			val, exist := exportValues[v.From]
+			if !exist {
+				if v.Optional {
+					continue
+				}
+				return nil, nil, fmt.Errorf(
+					"param %q: export %q not found in the preceding stages; the plan or the state may have been modified after nwsctl plan",
+					k, v.From)
+			}
+
+			imported[k] = val
+			params[k] = val
+		}
+	}
+
+	return params, imported, nil
 }
 
 func (g *taskGenerator) setupProducer() error {

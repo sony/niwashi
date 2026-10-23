@@ -31,7 +31,8 @@ func (p *InfraPlanner) BuildVertices(ctx planner.Context) error {
 			return fmt.Errorf("failed to find recipe %q: %w", generator.Provisioner, err)
 		}
 
-		vtx, err := planner.NewRecipeDagVertex(workflow.PhaseInfra, name, r, generator.Params, ctx, diff.BaseVertexData)
+		vtx, err := planner.NewRecipeDagVertex(
+			workflow.PhaseInfra, name, r, generator.Params, ctx, diff.BaseVertexData, generator.Import)
 		if err != nil {
 			return err
 		}

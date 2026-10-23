@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/sony/niwashi/internal/action"
 	"github.com/sony/niwashi/internal/file"
@@ -30,11 +29,6 @@ type PathConstraint interface {
 	GetDefaultPrefix() string
 }
 
-func trimForPath(path string) string {
-	nows := strings.Trim(path, " \t\r\n")
-	return strings.TrimPrefix(nows, "/")
-}
-
 func MakeJsonPatch(
 	sc *recipe.StateChangeOperation,
 	tplParams any,
@@ -44,11 +38,11 @@ func MakeJsonPatch(
 	patches := []patch.Patch{}
 
 	var absPath string
-	up := trimForPath(sc.Path)
+	up := patch.TrimForPath(sc.Path)
 	if up == "" {
 		absPath = constraint.GetDefaultPrefix()
 	} else {
-		absPath = constraint.GetDefaultPrefix() + "/" + trimForPath(sc.Path)
+		absPath = constraint.GetDefaultPrefix() + "/" + patch.TrimForPath(sc.Path)
 	}
 
 	if sc.Count != "" {

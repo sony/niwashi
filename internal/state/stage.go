@@ -11,6 +11,7 @@ import (
 	"github.com/sony/niwashi/internal/cmap"
 	"github.com/sony/niwashi/internal/instance"
 	"github.com/sony/niwashi/internal/logger"
+	"github.com/sony/niwashi/internal/patch"
 	"github.com/sony/niwashi/internal/profile"
 	"github.com/sony/niwashi/internal/types"
 )
@@ -452,4 +453,29 @@ func validateGeneratorImports(exportData Exports, stage *Stage) error {
 	}
 
 	return nil
+}
+
+func (s *Stage) GetExportValue(exp *Export) (any, error) {
+
+	caps, err := exp.Capabilities(s)
+	if err != nil {
+		return nil, err
+	}
+
+	c, exists := caps[exp.Capability]
+	if !exists {
+		return nil, fmt.Errorf("capability %q not found", exp.Capability)
+	}
+
+	paths, err := patch.ParsePath("/" + patch.TrimForPath(exp.Path))
+	if err != nil {
+		return nil, err
+	}
+	d := c.Store.Clone()
+	data, ok := d.Get(paths...)
+	if !ok {
+		return nil, fmt.Errorf("export path %q not found in capability %q", exp.Path, exp.Capability)
+	}
+
+	return data, nil
 }

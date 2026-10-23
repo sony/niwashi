@@ -4,6 +4,7 @@
 package state_test
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -190,4 +191,90 @@ func TestStage_ValidateImports_ErrorMessage(t *testing.T) {
 			t.Errorf("ValidateImports() error = %v, want %s in it", err, want)
 		}
 	}
+}
+
+func TestStage_GetExportValue(t *testing.T) {
+	newStage := func() *state.Stage {
+		s := &state.Stage{Inventory: state.NewInventory()}
+		s.Inventory.Nodes["gateway"] = &node.Node{Capabilities: cap.CapabilityList{
+			"org/squid-proxy": {Store: types.Dict{
+				"ca":          types.Dict{"cert": "PEM", "key": "KEY"},
+				"endpoint":    "http://gateway:3128",
+				"a/b":         "slash in key",
+				"listen_port": 3128,
+			}},
+		}}
+		s.Inventory.Clusters["k8s"] = &cluster.Cluster{Capabilities: cap.CapabilityList{
+			"org/k8s": {Store: types.Dict{"api": "https://k8s:6443"}},
+		}}
+		return s
+	}
+	nodeExport := func(path string) *state.Export {
+		return &state.Export{Node: "gateway", Capability: "org/squid-proxy", Path: path}
+	}
+
+	tests := []struct {
+		name    string
+		export  *state.Export
+		want    any
+		wantErr string // empty means no error
+	}{
+		{name: "scalar", export: nodeExport("endpoint"), want: "http://gateway:3128"},
+		{name: "nested", export: nodeExport("ca/cert"), want: "PEM"},
+		{name: "subtree", export: nodeExport("ca"), want: types.Dict{"cert": "PEM", "key": "KEY"}},
+		{name: "non-string value", export: nodeExport("listen_port"), want: 3128},
+		// the same notation as the relative path of stateChanges
+		{name: "leading slash", export: nodeExport("/ca/cert"), want: "PEM"},
+		{name: "surrounding spaces", export: nodeExport(" ca/cert "), want: "PEM"},
+		{name: "escaped slash in a key", export: nodeExport("a~1b"), want: "slash in key"},
+		{
+			name:   "cluster",
+			export: &state.Export{Cluster: "k8s", Capability: "org/k8s", Path: "api"},
+			want:   "https://k8s:6443",
+		},
+		{name: "path not found", export: nodeExport("ca/missing"), wantErr: `export path "ca/missing" not found`},
+		{
+			name:    "capability not found",
+			export:  &state.Export{Node: "gateway", Capability: "org/other", Path: "endpoint"},
+			wantErr: `capability "org/other" not found`,
+		},
+		{
+			name:    "node not found",
+			export:  &state.Export{Node: "missing", Capability: "org/squid-proxy", Path: "endpoint"},
+			wantErr: `node not found: "missing"`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := newStage().GetExportValue(tt.export)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("GetExportValue() error = %v", err)
+				}
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("GetExportValue() = %#v, want %#v", got, tt.want)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("GetExportValue() = %v, want an error", got)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("GetExportValue() error = %v, want %q in it", err, tt.wantErr)
+			}
+		})
+	}
+
+	t.Run("returned subtree does not share the store", func(t *testing.T) {
+		s := newStage()
+		got, err := s.GetExportValue(nodeExport("ca"))
+		if err != nil {
+			t.Fatalf("GetExportValue() error = %v", err)
+		}
+		got.(types.Dict)["cert"] = "changed"
+		store := s.Inventory.Nodes["gateway"].Capabilities["org/squid-proxy"].Store
+		if store["ca"].(types.Dict)["cert"] != "PEM" {
+			t.Errorf("store was changed through the returned value: %v", store)
+		}
+	})
 }

@@ -41,7 +41,8 @@ func NewRecipeDagVertex(
 	r *recipe.Recipe,
 	params types.Dict,
 	f cmap.RecipeFinder,
-	baseVertexData map[string]any) (*RecipeDagVertex, error) {
+	baseVertexData map[string]any,
+	imports types.Imports) (*RecipeDagVertex, error) {
 	fqid := r.Fqid()
 
 	data := baseVertexData
@@ -50,6 +51,9 @@ func NewRecipeDagVertex(
 	}
 	if params != nil {
 		data["params"] = params
+	}
+	if imports != nil {
+		data["import"] = imports
 	}
 
 	switch phase {
@@ -115,7 +119,7 @@ func (v *RecipeDagVertex) GetRequireVertices(ctx Context, require string) ([]*Re
 
 	switch req.Kind {
 	case workflow.PhaseHost:
-		vtx, err := NewRecipeDagVertex(workflow.PhaseHost, "", req, nil, ctx, nil)
+		vtx, err := NewRecipeDagVertex(workflow.PhaseHost, "", req, nil, ctx, nil, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -125,7 +129,7 @@ func (v *RecipeDagVertex) GetRequireVertices(ctx Context, require string) ([]*Re
 		case workflow.PhaseNode:
 			// Case1: Node recipe -> Node recipe
 			// Same node target
-			vtx, err := NewRecipeDagVertex(workflow.PhaseNode, v.GetTarget(), req, nil, ctx, nil)
+			vtx, err := NewRecipeDagVertex(workflow.PhaseNode, v.GetTarget(), req, nil, ctx, nil, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -141,7 +145,7 @@ func (v *RecipeDagVertex) GetRequireVertices(ctx Context, require string) ([]*Re
 
 			vertices := make([]*RecipeDagVertex, 0, len(cluster.Nodes))
 			for node := range cluster.Nodes {
-				vtx, err := NewRecipeDagVertex(workflow.PhaseNode, node, req, nil, ctx, nil)
+				vtx, err := NewRecipeDagVertex(workflow.PhaseNode, node, req, nil, ctx, nil, nil)
 				if err != nil {
 					return nil, err
 				}
@@ -151,7 +155,7 @@ func (v *RecipeDagVertex) GetRequireVertices(ctx Context, require string) ([]*Re
 			return vertices, nil
 		}
 	case workflow.PhaseCluster:
-		vtx, err := NewRecipeDagVertex(workflow.PhaseCluster, v.GetTarget(), req, nil, ctx, nil)
+		vtx, err := NewRecipeDagVertex(workflow.PhaseCluster, v.GetTarget(), req, nil, ctx, nil, nil)
 		if err != nil {
 			return nil, err
 		}

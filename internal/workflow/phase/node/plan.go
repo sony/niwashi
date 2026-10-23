@@ -51,7 +51,8 @@ func (p *NodeCapPlanner) BuildVertices(ctx planner.Context) error {
 				return err
 			}
 
-			vtx, err := planner.NewRecipeDagVertex(workflow.PhaseNode, nodeName, r, cap.Params, ctx, diff.BaseVertexData)
+			vtx, err := planner.NewRecipeDagVertex(
+				workflow.PhaseNode, nodeName, r, cap.Params, ctx, diff.BaseVertexData, cap.Import)
 			if err != nil {
 				return err
 			}

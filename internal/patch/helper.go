@@ -8,6 +8,11 @@ import (
 	"strings"
 )
 
+func TrimForPath(path string) string {
+	nows := strings.Trim(path, " \t\r\n")
+	return strings.TrimPrefix(nows, "/")
+}
+
 func ParsePath(path string) ([]string, error) {
 
 	if path == "" || path[0] != '/' {
