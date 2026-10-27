@@ -167,6 +167,42 @@ func TestCapability_Add(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			// imported is replaced as a whole, so a key no longer injected is removed
+			name: "imported: whole value replaced, others kept",
+			cap: &cap.Capability{
+				Version:  "0.0.1",
+				Params:   types.Params{"memory": "1024"},
+				Store:    types.Dict{"ip": "10.0.0.1"},
+				Imported: map[string]string{"cert": "old", "key": "old"},
+			},
+			path:  []string{"imported"},
+			value: map[string]string{"cert": "new"},
+			expect: &cap.Capability{
+				Version:  "0.0.1",
+				Params:   types.Params{"memory": "1024"},
+				Store:    types.Dict{"ip": "10.0.0.1"},
+				Imported: map[string]string{"cert": "new"},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "imported: invalid value type",
+			cap:     &cap.Capability{Version: "0.0.1"},
+			path:    []string{"imported"},
+			value:   map[string]any{"cert": "new"},
+			wantErr: true,
+		},
+		{
+			name: "imported: nested path is denied",
+			cap: &cap.Capability{
+				Version:  "0.0.1",
+				Imported: map[string]string{"cert": "old"},
+			},
+			path:    []string{"imported", "cert"},
+			value:   "new",
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

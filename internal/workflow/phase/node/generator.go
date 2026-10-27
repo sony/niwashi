@@ -26,7 +26,9 @@ func NewNodeTaskGenerator(ctx workflow.ApplyContext, job *workflow.Job) (workflo
 				ctx,
 				rtg.GetRecipe(),
 				rtg.GetRecipeWs().Target,
-				job)
+				job,
+				rtg.GetImported(),
+			)
 			if err != nil {
 				rtg.HoldError(err)
 			}
@@ -49,7 +51,9 @@ func NewNodeTaskGenerator(ctx workflow.ApplyContext, job *workflow.Job) (workflo
 				ctx,
 				rtg.GetRecipe(),
 				rtg.GetRecipeWs().Target,
-				job)
+				job,
+				rtg.GetImported(),
+			)
 			if err != nil {
 				rtg.HoldError(err)
 			}

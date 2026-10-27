@@ -136,6 +136,19 @@ func (c *Capability) Add(path []string, value any) error {
 			c.Store = make(map[string]any)
 		}
 		return c.Store.SetPath(value, path[1:]...)
+
+	case "imported":
+		if len(path) == 1 {
+			v, ok := value.(map[string]string)
+			if !ok {
+				return fmt.Errorf("invalid value type for capability imported: %T", value)
+			}
+			c.Imported = maps.Clone(v)
+			return nil
+		}
+
+		return fmt.Errorf("invalid path for capability imported: %v", path[1:])
+
 	default:
 		return fmt.Errorf("unsupported path for capability: %s", path[0])
 	}

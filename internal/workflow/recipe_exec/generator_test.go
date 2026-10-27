@@ -55,6 +55,15 @@ func TestTaskGenerator_HasWorkingTask(t *testing.T) {
 	}
 }
 
+// The hashes of the export values, as JSON (029 4):
+//
+//	printf '"PEM"' | sha256sum
+//	printf '{"host":"gateway","port":3128}' | sha256sum
+const (
+	hashPEM   = "495d8f9c23c6e1682bfbd1e3570c6d8f85d799f00d4c43660e73921a86f7cf21"
+	hashProxy = "b88e90edd7f1719ff480b1408a01009abcd8d08d4ae5a458430102316a94f231"
+)
+
 func TestCreateUserParams(t *testing.T) {
 	// the param name and the export name differ so that a lookup of the
 	// wrong one fails
@@ -77,27 +86,27 @@ func TestCreateUserParams(t *testing.T) {
 		name         string
 		job          *workflow.Job
 		want         map[string]any
-		wantImported map[string]any // the values actually injected, keyed by param name
-		wantErr      string         // empty means no error
+		wantImported map[string]string // the hashes of the values actually injected, keyed by param name
+		wantErr      string            // empty means no error
 	}{
-		{name: "nil data", job: &workflow.Job{}, want: map[string]any{}, wantImported: map[string]any{}},
+		{name: "nil data", job: &workflow.Job{}, want: map[string]any{}, wantImported: map[string]string{}},
 		{
 			name:         "params only",
 			job:          job(map[string]any{"update": true}, nil),
 			want:         map[string]any{"update": true},
-			wantImported: map[string]any{},
+			wantImported: map[string]string{},
 		},
 		{
 			name:         "import is added to params",
 			job:          job(map[string]any{"update": true}, types.Imports{"cert": {From: "proxy_ca_cert"}}),
 			want:         map[string]any{"update": true, "cert": "PEM"},
-			wantImported: map[string]any{"cert": "PEM"},
+			wantImported: map[string]string{"cert": hashPEM},
 		},
 		{
 			name:         "subtree value",
 			job:          job(nil, types.Imports{"proxy": {From: "proxy"}}),
 			want:         map[string]any{"proxy": map[string]any{"host": "gateway", "port": 3128}},
-			wantImported: map[string]any{"proxy": map[string]any{"host": "gateway", "port": 3128}},
+			wantImported: map[string]string{"proxy": hashProxy},
 		},
 		{
 			name:    "required export not found",
@@ -114,21 +123,21 @@ func TestCreateUserParams(t *testing.T) {
 			name:         "params has a key named after the export",
 			job:          job(map[string]any{"proxy_ca_cert": "/etc/ca.pem"}, types.Imports{"cert": {From: "proxy_ca_cert"}}),
 			want:         map[string]any{"proxy_ca_cert": "/etc/ca.pem", "cert": "PEM"},
-			wantImported: map[string]any{"cert": "PEM"},
+			wantImported: map[string]string{"cert": hashPEM},
 		},
 		{
 			// 029 3-3: no injection, params keeps its value; not recorded as imported (4)
 			name:         "optional, export not found",
 			job:          job(map[string]any{"cert": "/etc/ca.pem"}, types.Imports{"cert": {From: "proxy_endpoint", Optional: true}}),
 			want:         map[string]any{"cert": "/etc/ca.pem"},
-			wantImported: map[string]any{},
+			wantImported: map[string]string{},
 		},
 		{
 			// 029 3-3: the import overrides params when the export exists
 			name:         "optional, export found",
 			job:          job(map[string]any{"cert": "/etc/ca.pem"}, types.Imports{"cert": {From: "proxy_ca_cert", Optional: true}}),
 			want:         map[string]any{"cert": "PEM"},
-			wantImported: map[string]any{"cert": "PEM"},
+			wantImported: map[string]string{"cert": hashPEM},
 		},
 		{
 			// the form read back from plan.json
@@ -138,7 +147,7 @@ func TestCreateUserParams(t *testing.T) {
 				"key":  map[string]any{"from": "proxy_key", "optional": true},
 			}),
 			want:         map[string]any{"update": true, "cert": "PEM"},
-			wantImported: map[string]any{"cert": "PEM"},
+			wantImported: map[string]string{"cert": hashPEM},
 		},
 	}
 	for _, tt := range tests {

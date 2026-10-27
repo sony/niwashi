@@ -134,7 +134,7 @@ func TestAddCapability(t *testing.T) {
 			r := newTestRecipeSpec(tt.recipeId, version)
 			job := &workflow.Job{Data: tt.jobData}
 
-			err := recipe_exec.AddCapability(prefix, sm, r, target, job)
+			err := recipe_exec.AddCapability(prefix, sm, r, target, job, nil)
 			if !errors.Is(err, tt.applyErr) {
 				t.Errorf("AddCapability() error = %v, want %v", err, tt.applyErr)
 			}
@@ -288,7 +288,7 @@ func TestUpdateCapability(t *testing.T) {
 			r := newTestRecipeSpec("my/recipe", "1.1.0")
 			job := &workflow.Job{Data: tt.jobData}
 
-			err := recipe_exec.UpdateCapability(tt.prefix, sm, r, tt.target, job)
+			err := recipe_exec.UpdateCapability(tt.prefix, sm, r, tt.target, job, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("UpdateCapability() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -296,6 +296,60 @@ func TestUpdateCapability(t *testing.T) {
 			got := lookupCapability(sm.State(), tt.prefix, tt.target, "my/recipe")
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("capability after update = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAddCapability_Imported(t *testing.T) {
+	sm := &fakeStateManager{}
+	r := newTestRecipeSpec("my/recipe", "1.0.0")
+	imported := map[string]string{"cert": "hash-of-cert"}
+
+	if err := recipe_exec.AddCapability("/inventory/nodes", sm, r, "node-1", &workflow.Job{}, imported); err != nil {
+		t.Fatalf("AddCapability() error = %v", err)
+	}
+	if len(sm.patches) != 1 {
+		t.Fatalf("expected exactly 1 patch to be applied, got %d", len(sm.patches))
+	}
+	c := sm.patches[0].(*patch.AddPatch).Value.(*cap.Capability)
+	if !maps.Equal(c.Imported, imported) {
+		t.Errorf("Imported = %v, want %v", c.Imported, imported)
+	}
+}
+
+func TestUpdateCapability_Imported(t *testing.T) {
+	existing := newExistingCapability()
+	existing.Imported = map[string]string{"cert": "old-hash", "key": "old-hash"}
+
+	tests := []struct {
+		name     string
+		imported map[string]string
+		want     map[string]string
+	}{
+		{
+			// a key no longer injected (e.g. optional and the export is gone) is removed
+			name:     "replaced as a whole",
+			imported: map[string]string{"cert": "new-hash"},
+			want:     map[string]string{"cert": "new-hash"},
+		},
+		{
+			name:     "nothing injected",
+			imported: map[string]string{},
+			want:     map[string]string{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sm := applier.NewStateManager(nodeStateWith(existing.Clone()))
+			r := newTestRecipeSpec("my/recipe", "1.1.0")
+
+			if err := recipe_exec.UpdateCapability("/inventory/nodes", sm, r, "node-1", &workflow.Job{}, tt.imported); err != nil {
+				t.Fatalf("UpdateCapability() error = %v", err)
+			}
+			got := lookupCapability(sm.State(), "/inventory/nodes", "node-1", "my/recipe")
+			if !maps.Equal(got.Imported, tt.want) {
+				t.Errorf("Imported = %v, want %v", got.Imported, tt.want)
 			}
 		})
 	}

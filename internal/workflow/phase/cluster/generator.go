@@ -26,7 +26,9 @@ func NewClusterTaskGenerator(ctx workflow.ApplyContext, job *workflow.Job) (work
 				ctx,
 				rtg.GetRecipe(),
 				rtg.GetRecipeWs().Target,
-				job)
+				job,
+				rtg.GetImported(),
+			)
 
 			if err != nil {
 				rtg.HoldError(err)
@@ -51,7 +53,9 @@ func NewClusterTaskGenerator(ctx workflow.ApplyContext, job *workflow.Job) (work
 				ctx,
 				rtg.GetRecipe(),
 				rtg.GetRecipeWs().Target,
-				job)
+				job,
+				rtg.GetImported(),
+			)
 			if err != nil {
 				rtg.HoldError(err)
 			}

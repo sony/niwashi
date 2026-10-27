@@ -33,6 +33,7 @@ type RecipeContext interface {
 	GetRecipe() RecipeSpec
 	GetStoreData() map[string]any
 	GetUserParams() map[string]any
+	GetImported() map[string]string
 }
 
 type TaskGenerator interface {
@@ -58,6 +59,7 @@ type taskGenerator struct {
 	runState          *runState
 	operation         string
 	params            map[string]any
+	imported          map[string]string
 }
 
 func (g *taskGenerator) GetApplyContext() workflow.ApplyContext {
@@ -78,6 +80,10 @@ func (g *taskGenerator) GetRunState() RunState {
 
 func (g *taskGenerator) GetUserParams() map[string]any {
 	return g.params
+}
+
+func (g *taskGenerator) GetImported() map[string]string {
+	return g.imported
 }
 
 func (g *taskGenerator) GetOperation() string {
@@ -215,8 +221,7 @@ func _newRecipeTaskGenerator(ctx workflow.ApplyContext, job *workflow.Job) (*tas
 		return nil, err
 	}
 
-	// todo: keep imported data in next commit
-	params, _, err := createUserParams(job, ctx.GetExportValues())
+	params, imported, err := createUserParams(job, ctx.GetExportValues())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user params: %s", err)
 	}
@@ -248,6 +253,7 @@ func _newRecipeTaskGenerator(ctx workflow.ApplyContext, job *workflow.Job) (*tas
 		producers:    make(map[string]*Producer),
 		dirtyState:   true, // mark dirty to create runtime state in the first GetRuntimeState call
 		params:       params,
+		imported:     imported,
 	}
 
 	gen.stateMachine.AddTransitions(map[int]int{
@@ -315,9 +321,9 @@ func parseOptions(job *workflow.Job) (fqid string, phase string, target string) 
 	return fqid, phase, target
 }
 
-func createUserParams(job *workflow.Job, exportValues map[string]any) (map[string]any, map[string]any, error) {
+func createUserParams(job *workflow.Job, exportValues map[string]any) (map[string]any, map[string]string, error) {
 	params := map[string]any{}
-	imported := map[string]any{}
+	imported := map[string]string{}
 
 	d := job.Data
 	if d == nil {
@@ -364,7 +370,7 @@ func createUserParams(job *workflow.Job, exportValues map[string]any) (map[strin
 					k, v.From)
 			}
 
-			imported[k] = val
+			imported[k] = types.MakeHash(val)
 			params[k] = val
 		}
 	}
@@ -465,39 +471,42 @@ func (g *taskGenerator) generate() workflow.Task {
 func (g *taskGenerator) OnComplete(result workflow.TaskResult) error {
 
 	task, ok := result.GetTask().(*Task)
-	if ok {
+	if !ok {
+		return nil
+	}
+
+	taskName := task.GetName()
+	producer, ok := g.producers[taskName]
+	if !ok {
+		return nil
+	}
+
+	taskErr := result.GetError()
+
+	// invoke OnComplete for the producer to update its state
+	producer.OnComplete(task, taskErr)
+
+	var finalizeErr error
+	if workflow.CanComplete(producer) {
+
+		// producer has completed.
+
 		// remove the completed task from the graph
-		taskName := task.GetName()
-		producer, ok := g.producers[taskName]
-		if ok {
+		delete(g.producers, taskName)
+		g.graph.RemoveVertex(taskName)
 
-			taskErr := result.GetError()
+		// finalize the producer(apply patches to the runtime state)
+		finalizeErr = producer.Finalize(task)
 
-			// invoke OnComplete for the producer to update its state
-			producer.OnComplete(task, taskErr)
-
-			var finalizeErr error
-			// if the producer is completed,
-			// - remove it from the producers map and the graph
-			// - finalize: apply patches to the runtime state
-			if workflow.CanComplete(producer) {
-				delete(g.producers, taskName)
-				g.graph.RemoveVertex(taskName)
-
-				finalizeErr = producer.Finalize(task)
-
-				// check state dirty after applying patches
-				if finalizeErr == nil && g.ApplyContext.IsStateDirty() {
-					// mark dirty to update runtime state in the next GetRuntimeState call
-					g.dirtyState = true
-				}
-			}
-
-			g.HoldError(taskErr, finalizeErr)
-			return finalizeErr
+		// check state dirty after applying patches
+		if finalizeErr == nil && g.ApplyContext.IsStateDirty() {
+			// mark dirty to update runtime state in the next GetRuntimeState call
+			g.dirtyState = true
 		}
 	}
-	return nil
+
+	g.HoldError(taskErr, finalizeErr)
+	return finalizeErr
 }
 
 func (g *taskGenerator) HasWorkingTask() bool {

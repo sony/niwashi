@@ -25,7 +25,8 @@ func AddCapability(
 	sm workflow.StateManager,
 	r RecipeSpec,
 	target string,
-	job *workflow.Job) error {
+	job *workflow.Job,
+	imported map[string]string) error {
 
 	path := CapabilityRoot(prefix, r, target)
 	params := types.Params{}
@@ -39,8 +40,9 @@ func AddCapability(
 		patch.NewAddPatch(
 			path,
 			&cap.Capability{
-				Version: r.GetVersion(),
-				Params:  params,
+				Version:  r.GetVersion(),
+				Params:   params,
+				Imported: imported,
 			},
 		)}, nil, nil)
 
@@ -56,7 +58,8 @@ func UpdateCapability(
 	sm workflow.StateManager,
 	r RecipeSpec,
 	target string,
-	job *workflow.Job) error {
+	job *workflow.Job,
+	imported map[string]string) error {
 
 	path := CapabilityRoot(prefix, r, target)
 	params := map[string]any{}
@@ -74,6 +77,10 @@ func UpdateCapability(
 		patch.NewAddPatch(
 			path+"/params",
 			params,
+		),
+		patch.NewAddPatch(
+			path+"/imported",
+			imported,
 		),
 	}, nil, nil)
 
