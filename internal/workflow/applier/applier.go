@@ -13,6 +13,7 @@ import (
 	"github.com/sony/niwashi/internal/file"
 	"github.com/sony/niwashi/internal/logger"
 	"github.com/sony/niwashi/internal/plan"
+	"github.com/sony/niwashi/internal/state"
 	"github.com/sony/niwashi/internal/workflow"
 	"github.com/sony/niwashi/internal/workspace"
 )
@@ -91,6 +92,10 @@ func (a *Applier) Apply() error {
 		if err := runStage(ctx, stage); err != nil {
 			return err
 		}
+
+		if err := syncExportData(ctx); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -114,6 +119,55 @@ func runStage(ctx *applyContext, stage string) error {
 	)
 
 	return engine.Run(context.Background())
+}
+
+func syncExportData(ctx *applyContext) error {
+
+	stage := ctx.StageName()
+	if stage == state.InitStageName || stage == state.MainStageName {
+		// _init and main stages have no exports
+		return nil
+	}
+
+	currentStage, _ := ctx.state.FindStage(stage)
+	targetStage, existTargetStage := ctx.targetState.FindStage(stage)
+
+	var exports state.Exports
+
+	switch ctx.Plan().Mode {
+	case plan.ModeDefault:
+		// In construct mode, merge exports from the target stage into the current stage
+
+		if !existTargetStage {
+			// do nothing
+			return nil
+		}
+		exports = currentStage.ExportMerge(targetStage)
+
+	case plan.ModePrune:
+		// In prune mode, restrict exports to only those present in the target stage
+
+		if currentStage == nil || currentStage.Export == nil {
+			return nil
+		}
+
+		exports = currentStage.ExportRestrictTo(targetStage)
+
+	case plan.ModeDestroy:
+		// In destroy mode, clear all exports
+
+		if currentStage == nil || currentStage.Export == nil {
+			return nil
+		}
+
+		exports = nil
+	}
+
+	if err := ctx.SetExports(exports); err != nil {
+		return errors.Join(err, fmt.Errorf("failed to set exports"))
+	}
+
+	return ctx.SaveState()
 }
 
 func (a *Applier) OnTaskComplete(caller *workflow.Engine, res workflow.TaskResult) {

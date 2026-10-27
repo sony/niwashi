@@ -181,23 +181,6 @@ func (s *State) ResolveParams(prof *profile.Profile) error {
 	return nil
 }
 
-func effectiveExports(target, initial *Stage) Exports {
-	var exports Exports
-	if initial != nil {
-		exports = initial.Export.Clone()
-	}
-	if target != nil {
-		if exports == nil {
-			exports = target.Export.Clone()
-		} else {
-			for k, v := range target.Export {
-				exports[k] = v.Clone()
-			}
-		}
-	}
-	return exports
-}
-
 func (s *State) ValidateExportReferences(initial *State) error {
 	if s == nil {
 		return nil
@@ -219,7 +202,7 @@ func (s *State) ValidateExportReferences(initial *State) error {
 		targetStage, _ := s.FindStage(name)
 		initialStage, _ := initial.FindStage(name)
 
-		effective := effectiveExports(targetStage, initialStage)
+		effective := initialStage.ExportMerge(targetStage)
 		if err := effective.ValidateWith(targetStage, initialStage); err != nil {
 			return fmt.Errorf("stage %q: %w", name, err)
 		}
@@ -283,7 +266,7 @@ func (s *State) ValidateImports(stageOrder []string, initialState *State) error 
 		}
 
 		// Collect export data in the current stage for the next stage
-		e := effectiveExports(targetStage, initialStage)
+		e := initialStage.ExportMerge(targetStage)
 		for k, v := range e {
 			exportData[k] = v
 		}

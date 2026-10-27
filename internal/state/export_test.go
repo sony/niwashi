@@ -5,6 +5,7 @@ package state_test
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -871,5 +872,130 @@ func TestExports_ValidateImports(t *testing.T) {
 				t.Errorf("ValidateImports() error = %v, want %q in it", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+// exportsFixture returns the exports of the initial state (I) and the target
+// state (T). "proxy_ca_cert" is in both with different definitions,
+// "registry_url" only in I and "dns_server" only in T.
+func exportsFixture() (initial, target state.Exports) {
+	initial = state.Exports{
+		"proxy_ca_cert": {Node: "gateway", Capability: "org/squid-proxy", Path: "ca/cert"},
+		"registry_url":  {Node: "gateway", Capability: "org/registry", Path: "url"},
+	}
+	target = state.Exports{
+		"proxy_ca_cert": {Cluster: "edge", Capability: "org/squid-proxy-ha", Path: "ca/pem"},
+		"dns_server":    {Node: "resolver", Capability: "org/dns", Path: "address"},
+	}
+	return initial, target
+}
+
+func TestExports_Merge(t *testing.T) {
+	initial, target := exportsFixture()
+
+	tests := []struct {
+		name  string
+		e     state.Exports
+		other state.Exports
+		want  state.Exports
+	}{
+		{name: "both nil", want: nil},
+		{name: "nil receiver", other: target, want: target},
+		{name: "nil other", e: initial, want: initial},
+		{
+			// the same name is replaced with the whole definition of other
+			name:  "other wins on the same name",
+			e:     initial,
+			other: target,
+			want: state.Exports{
+				"proxy_ca_cert": target["proxy_ca_cert"],
+				"registry_url":  initial["registry_url"],
+				"dns_server":    target["dns_server"],
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.e.Merge(tt.other)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Merge() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+
+	t.Run("does not share entries with the inputs", func(t *testing.T) {
+		initial, target := exportsFixture()
+		got := initial.Merge(target)
+		got["proxy_ca_cert"].Path = "changed"
+		got["registry_url"].Path = "changed"
+		if target["proxy_ca_cert"].Path != "ca/pem" || initial["registry_url"].Path != "url" {
+			t.Errorf("Merge() result shares entries with the inputs")
+		}
+	})
+}
+
+func TestExports_RestrictTo(t *testing.T) {
+	initial, target := exportsFixture()
+
+	tests := []struct {
+		name  string
+		e     state.Exports
+		other state.Exports
+		want  state.Exports
+	}{
+		{name: "both nil", want: nil},
+		{name: "nil receiver", other: target, want: nil},
+		{name: "nil other", e: initial, want: nil},
+		{
+			// the names come from other, the definitions from the receiver
+			name:  "keeps the definitions of the receiver",
+			e:     initial,
+			other: target,
+			want:  state.Exports{"proxy_ca_cert": initial["proxy_ca_cert"]},
+		},
+		{
+			name:  "no common name",
+			e:     state.Exports{"registry_url": initial["registry_url"]},
+			other: state.Exports{"dns_server": target["dns_server"]},
+			want:  state.Exports{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.e.RestrictTo(tt.other)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("RestrictTo() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+
+	t.Run("does not modify or share entries with the receiver", func(t *testing.T) {
+		initial, target := exportsFixture()
+		got := initial.RestrictTo(target)
+		got["proxy_ca_cert"].Path = "changed"
+		if len(initial) != 2 || initial["proxy_ca_cert"].Path != "ca/cert" {
+			t.Errorf("RestrictTo() modified the receiver: %v", initial)
+		}
+	})
+}
+
+func TestStage_ExportMerge_ExportRestrictTo_Nil(t *testing.T) {
+	initial, target := exportsFixture()
+	i := &state.Stage{Export: initial}
+	tg := &state.Stage{Export: target}
+	var none *state.Stage
+
+	if got := none.ExportMerge(tg); !reflect.DeepEqual(got, target) {
+		t.Errorf("nil.ExportMerge() = %v, want %v", got, target)
+	}
+	if got := i.ExportMerge(none); !reflect.DeepEqual(got, initial) {
+		t.Errorf("ExportMerge(nil) = %v, want %v", got, initial)
+	}
+	if got := none.ExportRestrictTo(tg); got != nil {
+		t.Errorf("nil.ExportRestrictTo() = %v, want nil", got)
+	}
+	// the stage is absent in the target: nothing remains
+	if got := i.ExportRestrictTo(none); got != nil {
+		t.Errorf("ExportRestrictTo(nil) = %v, want nil", got)
 	}
 }

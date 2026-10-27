@@ -28,18 +28,35 @@ func (e Exports) Clone() Exports {
 	return clone
 }
 
-func (e Exports) Merge(other Exports) (Exports, error) {
+func (e Exports) Merge(other Exports) Exports {
 	if e == nil {
-		return other.Clone(), nil
+		return other.Clone()
 	} else if other == nil {
-		return e.Clone(), nil
+		return e.Clone()
 	}
 
 	merged := e.Clone()
 	for k := range other {
 		merged[k] = other[k].Clone()
 	}
-	return merged, nil
+	return merged
+}
+
+func (e Exports) RestrictTo(other Exports) Exports {
+	if e == nil {
+		return nil
+	} else if other == nil {
+		return nil
+	}
+
+	expt := e.Clone()
+
+	for key := range expt {
+		if _, exist := other[key]; !exist {
+			delete(expt, key)
+		}
+	}
+	return expt
 }
 
 func (e Exports) Validate() error {

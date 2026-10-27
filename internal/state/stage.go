@@ -94,10 +94,7 @@ func (s *Stage) merge(other *Stage) (*Stage, error) {
 	if err != nil {
 		return nil, err
 	}
-	clone.Export, err = s.Export.Merge(other.Export)
-	if err != nil {
-		return nil, err
-	}
+	clone.Export = s.Export.Merge(other.Export)
 
 	return clone, nil
 }
@@ -453,6 +450,32 @@ func validateGeneratorImports(exportData Exports, stage *Stage) error {
 	}
 
 	return nil
+}
+
+func (s *Stage) ExportMerge(other *Stage) Exports {
+	var base Exports
+	var o Exports
+	if s != nil {
+		base = s.Export
+	}
+	if other != nil {
+		o = other.Export
+	}
+
+	return base.Merge(o)
+}
+
+func (s *Stage) ExportRestrictTo(other *Stage) Exports {
+	var base Exports
+	var o Exports
+	if s != nil {
+		base = s.Export
+	}
+	if other != nil {
+		o = other.Export
+	}
+
+	return base.RestrictTo(o)
 }
 
 func (s *Stage) GetExportValue(exp *Export) (any, error) {

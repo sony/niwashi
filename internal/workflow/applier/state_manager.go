@@ -201,6 +201,16 @@ func (sm *stateManager) saveTaskResult(
 	return e
 }
 
+func (sm *stateManager) setExports(stageName string, exports state.Exports) error {
+	stage, err := sm.state.StageForWrite(stageName)
+	if err != nil {
+		return err
+	}
+	stage.Export = exports
+	sm.dirtyState = true
+	return nil
+}
+
 func (sm *stateManager) SaveTaskResult(
 	operation string,
 	job *workflow.Job,
@@ -244,6 +254,14 @@ func (sm *stageStateManager) SaveTaskResult(
 		job,
 		err,
 	)
+}
+
+func (sm *stageStateManager) StageName() string {
+	return sm.stageName
+}
+
+func (sm *stageStateManager) SetExports(exports state.Exports) error {
+	return sm.setExports(sm.stageName, exports)
 }
 
 type PatchSaver struct {
