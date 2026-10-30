@@ -4,8 +4,6 @@
 package types
 
 import (
-	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -216,11 +214,5 @@ func (d *Dict) Hash() string {
 	if d == nil || *d == nil {
 		return ""
 	}
-	// Use a consistent serialization method for hashing
-	b, err := json.Marshal(*d)
-	if err != nil {
-		return ""
-	}
-	h := sha256.Sum256(b)
-	return fmt.Sprintf("%x", h)
+	return MakeHash(*d)
 }

@@ -6,14 +6,17 @@
 package e2e
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/sony/niwashi/internal/plan"
 	"github.com/sony/niwashi/internal/state"
+	"github.com/sony/niwashi/internal/types"
 	"github.com/sony/niwashi/test/e2e/helpers"
 )
 
@@ -249,4 +252,89 @@ func TestStage_PruneRemovesPreStage(t *testing.T) {
 	// the removed pre-stage must not count as a second pre-stage
 	proxyState := writePreStageState(t, workDir, "proxy")
 	cli.RunSuccess(t, "plan", "--recipe-dir", recipeDir, "--target", mainState, "--target", proxyState)
+}
+
+// TestStage_ExportAndImport checks that a value written to the store in a
+// pre-stage reaches the params of a recipe in the main stage through export
+// and import, and that state.json records the export definition, the import
+// and the hash of the imported value.
+func TestStage_ExportAndImport(t *testing.T) {
+	const (
+		exportCap = "integ-test/stage-export"
+		importCap = "integ-test/stage-import"
+		// the SHA-256 of the JSON form: printf '"PEM"' | sha256sum
+		hashPEM = "495d8f9c23c6e1682bfbd1e3570c6d8f85d799f00d4c43660e73921a86f7cf21"
+	)
+
+	cli, workDir, recipeDir, markerFile := newStageCLI(t)
+	// the capability of the export is written as an FQID to check that it is
+	// recorded as the recipe ID
+	preState := writeStateFile(t, workDir, "bootstrap.yaml", `version: nws.state/v1
+stages:
+  bootstrap:
+    inventory:
+      nodes:
+        gateway:
+          capabilities:
+          - `+exportCap+`
+    infrastructure:
+      generators:
+        dummy:
+          provisioner: external-instance
+          params:
+            instances:
+              dummy1: {}
+    export:
+      proxy_ca_cert:
+        node: gateway
+        capability: `+exportCap+`@1.0.0
+        path: ca/cert
+`)
+	// "dns" imports an export that no stage has, so the recipe default is used
+	mainState := writeInventoryState(t, workDir, "target.yaml", `  nodes:
+    cp:
+      capabilities:
+      - id: `+importCap+`
+        import:
+          ca: proxy_ca_cert
+          dns:
+            from: dns_server
+            optional: true
+`)
+
+	cli.RunSuccess(t, "plan", "--recipe-dir", recipeDir, "--target", mainState, "--target", preState)
+	cli.RunSuccess(t, "apply", "--recipe-dir", recipeDir, "--plan", "plan.json")
+	assertMarkerLines(t, readMarkerLines(t, markerFile), []string{"construct export gateway", "construct import ca=PEM dns=none"})
+
+	s := readState(t, workDir)
+	pre, ok := s.Stages["bootstrap"]
+	if !ok {
+		t.Fatalf("state.json has no pre-stage bootstrap: %+v", s.Stages)
+	}
+	wantExports := state.Exports{
+		"proxy_ca_cert": {Node: "gateway", Capability: exportCap, Path: "ca/cert"},
+	}
+	if !reflect.DeepEqual(pre.Export, wantExports) {
+		t.Errorf("exports of the pre-stage = %v, want %v", pre.Export, wantExports)
+	}
+
+	c := nodeCapability(s, "cp", importCap)
+	if c == nil {
+		t.Fatalf("state.json has no capability %s of cp", importCap)
+	}
+	wantImports := types.Imports{
+		"ca":  {From: "proxy_ca_cert"},
+		"dns": {From: "dns_server", Optional: true},
+	}
+	if !reflect.DeepEqual(c.Import, wantImports) {
+		t.Errorf("import = %v, want %v", c.Import, wantImports)
+	}
+	// only the injected key is recorded
+	if want := map[string]string{"ca": hashPEM}; !maps.Equal(c.Imported, want) {
+		t.Errorf("imported = %v, want %v", c.Imported, want)
+	}
+	// the imported value is not mixed into the params
+	if _, ok := c.Params["ca"]; ok {
+		t.Errorf("params = %v, must not have the imported value", c.Params)
+	}
 }

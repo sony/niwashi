@@ -38,6 +38,8 @@ type ApplyContext interface {
 	BuildAction(ctx action.ActionContext) (action.Action, error)
 
 	RunContext() action.RunContext
+
+	GetExportValues() map[string]any
 }
 
 type StateManager interface {

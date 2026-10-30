@@ -31,6 +31,7 @@ type applyContext struct {
 
 	targetStageView *state.StageView
 	workflowGraph   *plan.Workflow
+	exportValues    map[string]any
 }
 
 func NewApplyContext(cfg *Config) (*applyContext, error) {
@@ -116,12 +117,15 @@ func (c *applyContext) WithStage(stage string) (*applyContext, error) {
 		newCtx.targetStageView = state.NewEmptyStageView(r)
 	}
 
-	if c.plan != nil {
-		switch c.plan.Mode {
-		case plan.ModeDefault:
-			newCtx.workflowGraph = newCtx.plan.ExecutionPlan.ConstructGraph[stage]
-		case plan.ModeDestroy, plan.ModePrune:
-			newCtx.workflowGraph = newCtx.plan.ExecutionPlan.DestructGraph[stage]
+	if newCtx.plan != nil {
+		g, err := newCtx.plan.Graph()
+		if err != nil {
+			return nil, err
+		}
+		newCtx.workflowGraph = g[stage]
+		newCtx.exportValues, err = newCtx.resolveExportData(stage, c.state)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -131,6 +135,34 @@ func (c *applyContext) WithStage(stage string) (*applyContext, error) {
 	}
 
 	return &newCtx, err
+}
+
+func (c *applyContext) resolveExportData(stage string, currentState *state.State) (map[string]any, error) {
+
+	// Create export data before "stage"
+	order, err := c.plan.ConstructStageOrder()
+	if err != nil {
+		return nil, err
+	}
+
+	exportValues := make(map[string]any)
+	for _, s := range order {
+		if s == stage {
+			break
+		}
+
+		if st, exist := currentState.FindStage(s); exist {
+			for k, exp := range st.Export {
+				val, err := st.GetExportValue(exp)
+				if err != nil {
+					return nil, err
+				}
+				exportValues[k] = val
+			}
+		}
+
+	}
+	return exportValues, nil
 }
 
 func (c *applyContext) RecipeFinder() cmap.RecipeFinder {
@@ -171,6 +203,10 @@ func (c *applyContext) FileSystem() file.FileSystem {
 
 func (c *applyContext) TaskFinished(res workflow.TaskResult) error {
 	return c.SaveTaskResult(c.operation, res.GetTask().GetJob(), res.GetError())
+}
+
+func (c *applyContext) GetExportValues() map[string]any {
+	return c.exportValues
 }
 
 type runContext struct {

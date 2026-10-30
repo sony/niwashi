@@ -6,13 +6,16 @@ package applier
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/sony/niwashi/internal/action"
+	"github.com/sony/niwashi/internal/cap"
 	"github.com/sony/niwashi/internal/node"
 	"github.com/sony/niwashi/internal/plan"
 	"github.com/sony/niwashi/internal/recipe"
 	"github.com/sony/niwashi/internal/state"
+	"github.com/sony/niwashi/internal/types"
 	"github.com/sony/niwashi/internal/workflow"
 )
 
@@ -402,4 +405,113 @@ func Test_applyContext_WithStage_GraphByMode(t *testing.T) {
 			}
 		})
 	}
+}
+
+// newExportFixture returns a root context whose current state has the pre-stage
+// "bootstrap" exporting "proxy_ca_cert" from the node "gateway". The main stage
+// has no node, so looking up the source in the main stage fails.
+func newExportFixture(mode plan.Mode, path string) *applyContext {
+	current := state.NewState()
+	bootstrap := &state.Stage{Inventory: state.NewInventory()}
+	bootstrap.Inventory.Nodes["gateway"] = &node.Node{Capabilities: cap.CapabilityList{
+		"org/squid-proxy": {Store: types.Dict{"ca": types.Dict{"cert": "PEM"}}},
+	}}
+	bootstrap.Export = state.Exports{
+		"proxy_ca_cert": {Node: "gateway", Capability: "org/squid-proxy", Path: path},
+	}
+	current.Stages["bootstrap"] = bootstrap
+	current.SetDefaults()
+
+	graphs := newStageGraphs(state.InitStageName, "bootstrap", state.MainStageName)
+	return &applyContext{
+		stageStateManager: newStageStateManager(current, state.MainStageName),
+		plan: &plan.Plan{
+			Mode:          mode,
+			ExecutionPlan: plan.ExecutionPlan{ConstructGraph: graphs, DestructGraph: graphs},
+		},
+		targetState: state.NewState(),
+		operation:   recipe.OperationConstruct,
+	}
+}
+
+func Test_applyContext_WithStage_ExportValues(t *testing.T) {
+	tests := []struct {
+		name  string
+		mode  plan.Mode
+		stage string
+		want  map[string]any
+	}{
+		{
+			// the source is in the pre-stage, not in the main stage
+			name:  "main stage gets the exports of the pre-stage",
+			mode:  plan.ModeDefault,
+			stage: state.MainStageName,
+			want:  map[string]any{"proxy_ca_cert": "PEM"},
+		},
+		{
+			// a stage can import only from the preceding stages
+			name:  "pre-stage does not get its own exports",
+			mode:  plan.ModeDefault,
+			stage: "bootstrap",
+			want:  map[string]any{},
+		},
+		{
+			name:  "init stage gets nothing",
+			mode:  plan.ModeDefault,
+			stage: state.InitStageName,
+			want:  map[string]any{},
+		},
+		{
+			// the stages run in reverse order, but "preceding" follows the construct order
+			name:  "destroy: main stage gets the exports of the pre-stage",
+			mode:  plan.ModeDestroy,
+			stage: state.MainStageName,
+			want:  map[string]any{"proxy_ca_cert": "PEM"},
+		},
+		{
+			name:  "prune: main stage gets the exports of the pre-stage",
+			mode:  plan.ModePrune,
+			stage: state.MainStageName,
+			want:  map[string]any{"proxy_ca_cert": "PEM"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, err := newExportFixture(tt.mode, "ca/cert").WithStage(tt.stage)
+			if err != nil {
+				t.Fatalf("WithStage() error = %v", err)
+			}
+			got := ctx.GetExportValues()
+			if len(got) != len(tt.want) {
+				t.Fatalf("GetExportValues() = %v, want %v", got, tt.want)
+			}
+			for k, v := range tt.want {
+				if got[k] != v {
+					t.Errorf("GetExportValues()[%q] = %v, want %v", k, got[k], v)
+				}
+			}
+		})
+	}
+
+	t.Run("path not found stops at the start of the stage", func(t *testing.T) {
+		_, err := newExportFixture(plan.ModeDefault, "ca/missing").WithStage(state.MainStageName)
+		if err == nil {
+			t.Fatal("WithStage() succeeded unexpectedly")
+		}
+		if !strings.Contains(err.Error(), `"ca/missing"`) {
+			t.Errorf("WithStage() error = %v, want the path in it", err)
+		}
+	})
+
+	t.Run("no export", func(t *testing.T) {
+		root := newExportFixture(plan.ModeDefault, "ca/cert")
+		root.state.Stages["bootstrap"].Export = nil
+		ctx, err := root.WithStage(state.MainStageName)
+		if err != nil {
+			t.Fatalf("WithStage() error = %v", err)
+		}
+		if got := ctx.GetExportValues(); len(got) != 0 {
+			t.Errorf("GetExportValues() = %v, want empty", got)
+		}
+	})
 }

@@ -4,7 +4,9 @@
 package recipe_exec
 
 import (
+	"encoding/json"
 	"fmt"
+	"maps"
 
 	"github.com/sony/niwashi/internal/file"
 	"github.com/sony/niwashi/internal/logger"
@@ -30,6 +32,8 @@ type RecipeContext interface {
 	GetStateFileName() string
 	GetRecipe() RecipeSpec
 	GetStoreData() map[string]any
+	GetUserParams() map[string]any
+	GetImported() map[string]string
 }
 
 type TaskGenerator interface {
@@ -54,6 +58,8 @@ type taskGenerator struct {
 	stateMachine      *workflow.StateMachine
 	runState          *runState
 	operation         string
+	params            map[string]any
+	imported          map[string]string
 }
 
 func (g *taskGenerator) GetApplyContext() workflow.ApplyContext {
@@ -70,6 +76,14 @@ func (g *taskGenerator) GetJob() *workflow.Job {
 
 func (g *taskGenerator) GetRunState() RunState {
 	return g.runState
+}
+
+func (g *taskGenerator) GetUserParams() map[string]any {
+	return g.params
+}
+
+func (g *taskGenerator) GetImported() map[string]string {
+	return g.imported
 }
 
 func (g *taskGenerator) GetOperation() string {
@@ -207,6 +221,11 @@ func _newRecipeTaskGenerator(ctx workflow.ApplyContext, job *workflow.Job) (*tas
 		return nil, err
 	}
 
+	params, imported, err := createUserParams(job, ctx.GetExportValues())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user params: %s", err)
+	}
+
 	op := ctx.Operation()
 	if update, ok := job.GetFromData("update"); ok {
 		if updateBool, ok := update.(bool); ok && updateBool {
@@ -233,6 +252,8 @@ func _newRecipeTaskGenerator(ctx workflow.ApplyContext, job *workflow.Job) (*tas
 		recipeWs:     recipeWs,
 		producers:    make(map[string]*Producer),
 		dirtyState:   true, // mark dirty to create runtime state in the first GetRuntimeState call
+		params:       params,
+		imported:     imported,
 	}
 
 	gen.stateMachine.AddTransitions(map[int]int{
@@ -298,6 +319,70 @@ func parseOptions(job *workflow.Job) (fqid string, phase string, target string) 
 	phase = job.GetPhase()
 
 	return fqid, phase, target
+}
+
+func importsFrom(i any) (types.Imports, error) {
+	jsonBytes, err := json.Marshal(i)
+	if err != nil {
+		return nil, err
+	}
+	var imp types.Imports
+	if err := json.Unmarshal(jsonBytes, &imp); err != nil {
+		return nil, err
+	}
+	return imp, nil
+}
+
+func createUserParams(job *workflow.Job, exportValues map[string]any) (map[string]any, map[string]string, error) {
+	params := map[string]any{}
+	imported := map[string]string{}
+
+	d := job.Data
+	if d == nil {
+		return params, imported, nil
+	}
+
+	// "data" field in workflow.Job as params, which includes the followings:
+	//    - params in profile by user
+	//    - params in capability by user
+	// These compositions are done in plan phase.
+	if data, found := d.(map[string]any)["params"]; found {
+		params = maps.Clone(data.(map[string]any))
+	}
+
+	// resolve import data
+	if i, found := d.(map[string]any)["import"]; found {
+		imp, err := importsFrom(i)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		for k, v := range imp {
+			// `optional:false` & params[key] exists -> error
+			if !v.Optional {
+				if _, exist := params[k]; exist {
+					return nil, nil, fmt.Errorf(
+						"param %q is set by both params and import (from %q); the plan may have been modified after nwsctl plan",
+						k, v.From)
+				}
+			}
+
+			val, exist := exportValues[v.From]
+			if !exist {
+				if v.Optional {
+					continue
+				}
+				return nil, nil, fmt.Errorf(
+					"param %q: export %q not found in the preceding stages; the plan or the state may have been modified after nwsctl plan",
+					k, v.From)
+			}
+
+			imported[k] = types.MakeHash(val)
+			params[k] = val
+		}
+	}
+
+	return params, imported, nil
 }
 
 func (g *taskGenerator) setupProducer() error {
@@ -393,39 +478,42 @@ func (g *taskGenerator) generate() workflow.Task {
 func (g *taskGenerator) OnComplete(result workflow.TaskResult) error {
 
 	task, ok := result.GetTask().(*Task)
-	if ok {
+	if !ok {
+		return nil
+	}
+
+	taskName := task.GetName()
+	producer, ok := g.producers[taskName]
+	if !ok {
+		return nil
+	}
+
+	taskErr := result.GetError()
+
+	// invoke OnComplete for the producer to update its state
+	producer.OnComplete(task, taskErr)
+
+	var finalizeErr error
+	if workflow.CanComplete(producer) {
+
+		// producer has completed.
+
 		// remove the completed task from the graph
-		taskName := task.GetName()
-		producer, ok := g.producers[taskName]
-		if ok {
+		delete(g.producers, taskName)
+		g.graph.RemoveVertex(taskName)
 
-			taskErr := result.GetError()
+		// finalize the producer(apply patches to the runtime state)
+		finalizeErr = producer.Finalize(task)
 
-			// invoke OnComplete for the producer to update its state
-			producer.OnComplete(task, taskErr)
-
-			var finalizeErr error
-			// if the producer is completed,
-			// - remove it from the producers map and the graph
-			// - finalize: apply patches to the runtime state
-			if workflow.CanComplete(producer) {
-				delete(g.producers, taskName)
-				g.graph.RemoveVertex(taskName)
-
-				finalizeErr = producer.Finalize(task)
-
-				// check state dirty after applying patches
-				if finalizeErr == nil && g.ApplyContext.IsStateDirty() {
-					// mark dirty to update runtime state in the next GetRuntimeState call
-					g.dirtyState = true
-				}
-			}
-
-			g.HoldError(taskErr, finalizeErr)
-			return finalizeErr
+		// check state dirty after applying patches
+		if finalizeErr == nil && g.ApplyContext.IsStateDirty() {
+			// mark dirty to update runtime state in the next GetRuntimeState call
+			g.dirtyState = true
 		}
 	}
-	return nil
+
+	g.HoldError(taskErr, finalizeErr)
+	return finalizeErr
 }
 
 func (g *taskGenerator) HasWorkingTask() bool {

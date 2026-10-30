@@ -6,15 +6,18 @@ package cap
 import (
 	"errors"
 	"fmt"
+	"maps"
 
 	"github.com/sony/niwashi/internal/patch"
 	"github.com/sony/niwashi/internal/types"
 )
 
 type Capability struct {
-	Version string       `json:"version,omitempty" yaml:"version,omitempty"`
-	Params  types.Params `json:"params,omitempty" yaml:"params,omitempty"`
-	Store   types.Dict   `json:"store,omitempty" yaml:"store,omitempty"` // for runtime use, not merged or applied
+	Version  string            `json:"version,omitempty" yaml:"version,omitempty"`
+	Params   types.Params      `json:"params,omitempty" yaml:"params,omitempty"`
+	Store    types.Dict        `json:"store,omitempty" yaml:"store,omitempty"` // for runtime use, not merged or applied
+	Import   types.Imports     `json:"import,omitempty" yaml:"import,omitempty"`
+	Imported map[string]string `json:"imported,omitempty" yaml:"imported,omitempty"`
 }
 
 func (c *Capability) SearchId(id string) string {
@@ -36,6 +39,8 @@ func (c *Capability) Clone() *Capability {
 	clone.Version = c.Version
 	clone.Params = c.Params.Clone()
 	clone.Store = c.Store.Clone()
+	clone.Import = c.Import.Clone()
+	clone.Imported = maps.Clone(c.Imported)
 
 	return clone
 }
@@ -47,6 +52,10 @@ func (c *Capability) Validate() error {
 	}
 
 	if e := c.Store.ValidateAsTemplateVar(); e != nil {
+		err = errors.Join(err, e)
+	}
+
+	if e := c.Import.Validate(); e != nil {
 		err = errors.Join(err, e)
 	}
 
@@ -79,7 +88,22 @@ func (c *Capability) Merge(other *Capability) (*Capability, error) {
 		return nil, err
 	}
 
+	clone.Import = c.Import.Merge(other.Import)
+
 	return clone, nil
+}
+
+// replaceWhole sets a field of a capability that is replaced as a whole.
+func replaceWhole[T any](field string, rest []string, value any, set func(T)) error {
+	if len(rest) != 0 {
+		return fmt.Errorf("invalid path for capability %s: %v", field, rest)
+	}
+	v, ok := value.(T)
+	if !ok {
+		return fmt.Errorf("invalid value type for capability %s: %T", field, value)
+	}
+	set(v)
+	return nil
 }
 
 func (c *Capability) Add(path []string, value any) error {
@@ -89,29 +113,13 @@ func (c *Capability) Add(path []string, value any) error {
 
 	switch path[0] {
 	case "version":
-		if len(path) == 1 {
-			v, ok := value.(string)
-			if !ok {
-				return fmt.Errorf("invalid value type for capability version: %T", value)
-			}
+		return replaceWhole("version", path[1:], value, func(v string) {
 			c.Version = v
-			return nil
-		}
-		// deny adding nested paths under version
-		return fmt.Errorf("invalid path for capability version: %v", path[1:])
+		})
 	case "params":
-		if len(path) == 1 {
-			v, ok := value.(map[string]any)
-			if !ok {
-				return fmt.Errorf("invalid value type for capability params: %T", value)
-			}
+		return replaceWhole("params", path[1:], value, func(v map[string]any) {
 			c.Params = types.CloneMap(v)
-			return nil
-		}
-
-		// deny adding nested paths under params
-		return fmt.Errorf("invalid path for capability params: %v", path[1:])
-
+		})
 	case "store":
 		if len(path) == 1 {
 			v, ok := value.(map[string]any)
@@ -125,6 +133,17 @@ func (c *Capability) Add(path []string, value any) error {
 			c.Store = make(map[string]any)
 		}
 		return c.Store.SetPath(value, path[1:]...)
+
+	case "import":
+		return replaceWhole("import", path[1:], value, func(v types.Imports) {
+			c.Import = v.Clone()
+		})
+
+	case "imported":
+		return replaceWhole("imported", path[1:], value, func(v map[string]string) {
+			c.Imported = maps.Clone(v)
+		})
+
 	default:
 		return fmt.Errorf("unsupported path for capability: %s", path[0])
 	}

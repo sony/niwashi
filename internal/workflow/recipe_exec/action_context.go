@@ -36,7 +36,7 @@ func NewBaseActionContext(g RecipeContext, task TaskSpec, adapterRecipe RecipeSp
 	// Merge order:
 	// - No adapter case: user params > task
 	// - Adapter case: user params > caller(task) > callee(adapterTask)
-	params := action.GetFinalParams(createParams(g.GetJob()), task, adapterRecipe)
+	finalParams := action.GetFinalParams(g.GetUserParams(), task, adapterRecipe)
 
 	store := g.GetStoreData()
 
@@ -49,7 +49,7 @@ func NewBaseActionContext(g RecipeContext, task TaskSpec, adapterRecipe RecipeSp
 
 	tplParams := action.NewTemplateParams(
 		action.WithTaskDirs(taskWs),
-		action.WithParams(params),
+		action.WithParams(finalParams),
 		action.WithStore(store),
 		action.WithTarget(g.GetRecipeWs().Target),
 		action.WithRuntime(g.GetRuntimeState().Runtime),
@@ -60,29 +60,12 @@ func NewBaseActionContext(g RecipeContext, task TaskSpec, adapterRecipe RecipeSp
 		recipeContext: g,
 		task:          task,
 		adapterRecipe: adapterRecipe,
-		params:        params,
+		params:        finalParams,
 		tplParams:     tplParams,
 		store:         store,
 		taskWs:        taskWs,
 		runtimeState:  g.GetRuntimeState(),
 	}, nil
-}
-
-func createParams(job *workflow.Job) map[string]any {
-	params := map[string]any{}
-
-	// "data" field in workflow.Job as params, which includes the followings:
-	//    - params in profile by user
-	//    - params in capability by user
-	// These compositions are done in plan phase.
-	d := job.Data
-	if d != nil {
-		if data, found := d.(map[string]any)["params"]; found {
-			params = data.(map[string]any)
-		}
-	}
-
-	return params
 }
 
 type actionContext struct {

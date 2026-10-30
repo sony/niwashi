@@ -11,6 +11,7 @@ import (
 	"github.com/sony/niwashi/internal/cmap"
 	"github.com/sony/niwashi/internal/instance"
 	"github.com/sony/niwashi/internal/logger"
+	"github.com/sony/niwashi/internal/patch"
 	"github.com/sony/niwashi/internal/profile"
 	"github.com/sony/niwashi/internal/types"
 )
@@ -22,7 +23,7 @@ const DefaultStageName = MainStageName
 type Stage struct {
 	Inventory      *Inventory      `json:"inventory,omitempty" yaml:"inventory,omitempty"`
 	Infrastructure *Infrastructure `json:"infrastructure,omitempty" yaml:"infrastructure,omitempty"`
-	Export         types.Dict      `json:"export,omitempty" yaml:"export,omitempty"`
+	Export         Exports         `json:"export,omitempty" yaml:"export,omitempty"`
 }
 
 func (s *Stage) setDefaults() {
@@ -41,9 +42,6 @@ func (s *Stage) setDefaults() {
 	s.Inventory.SetDefaults()
 
 	// don't init Export field by default
-	// if s.Export == nil {
-	// 	s.Export = types.Dict{}
-	// }
 }
 
 func (s *Stage) isEmpty() bool {
@@ -96,10 +94,7 @@ func (s *Stage) merge(other *Stage) (*Stage, error) {
 	if err != nil {
 		return nil, err
 	}
-	clone.Export, err = types.Merge(s.Export, other.Export)
-	if err != nil {
-		return nil, err
-	}
+	clone.Export = s.Export.Merge(other.Export)
 
 	return clone, nil
 }
@@ -115,6 +110,12 @@ func (s *Stage) validate() error {
 
 	if s.Inventory != nil {
 		if e := s.Inventory.Validate(); e != nil {
+			err = errors.Join(err, e)
+		}
+	}
+
+	if s.Export != nil {
+		if e := s.Export.Validate(); e != nil {
 			err = errors.Join(err, e)
 		}
 	}
@@ -296,6 +297,13 @@ func (s *Stage) normalize(f cmap.RecipeFinder) error {
 		}
 	}
 
+	// Normalize exports
+	if s.Export != nil {
+		if err := s.Export.Normalize(f); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -366,4 +374,131 @@ func (s *Stage) resolveParams(prof *profile.Profile) error {
 		cluster.Params = make(types.Params)
 	}
 	return nil
+}
+
+func (s *Stage) ValidateImports(exportData Exports) error {
+	if s == nil {
+		return nil
+	}
+
+	if err := validateNodeCapImports(exportData, s); err != nil {
+		return err
+	}
+	if err := validateClusterCapImports(exportData, s); err != nil {
+		return err
+	}
+	if err := validateGeneratorImports(exportData, s); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateNodeCapImports(exportData Exports, stage *Stage) error {
+	if stage == nil || stage.Inventory == nil || stage.Inventory.Nodes == nil {
+		return nil
+	}
+
+	for name, node := range stage.Inventory.Nodes {
+		if node.Capabilities == nil {
+			continue
+		}
+
+		if err := validateCapImports(exportData, node.Capabilities); err != nil {
+			return fmt.Errorf("node %q: %w", name, err)
+		}
+	}
+
+	return nil
+}
+
+func validateClusterCapImports(exportData Exports, stage *Stage) error {
+	if stage == nil || stage.Inventory == nil || stage.Inventory.Clusters == nil {
+		return nil
+	}
+
+	for name, cluster := range stage.Inventory.Clusters {
+		if cluster.Capabilities == nil {
+			continue
+		}
+
+		if err := validateCapImports(exportData, cluster.Capabilities); err != nil {
+			return fmt.Errorf("cluster %q: %w", name, err)
+		}
+	}
+	return nil
+}
+
+func validateCapImports(exportData Exports, capList cap.CapabilityList) error {
+	for capID, c := range capList {
+		if err := exportData.ValidateImports(c.Params, c.Import); err != nil {
+			return fmt.Errorf("capability %q: %w", capID, err)
+		}
+	}
+	return nil
+}
+
+func validateGeneratorImports(exportData Exports, stage *Stage) error {
+	if stage == nil || stage.Infrastructure == nil || stage.Infrastructure.Generators == nil {
+		return nil
+	}
+
+	for name, gen := range stage.Infrastructure.Generators {
+		if err := exportData.ValidateImports(gen.Params, gen.Import); err != nil {
+			return fmt.Errorf("generator %q: %w", name, err)
+		}
+	}
+
+	return nil
+}
+
+func (s *Stage) ExportMerge(other *Stage) Exports {
+	var base Exports
+	var o Exports
+	if s != nil {
+		base = s.Export
+	}
+	if other != nil {
+		o = other.Export
+	}
+
+	return base.Merge(o)
+}
+
+func (s *Stage) ExportRestrictTo(other *Stage) Exports {
+	var base Exports
+	var o Exports
+	if s != nil {
+		base = s.Export
+	}
+	if other != nil {
+		o = other.Export
+	}
+
+	return base.RestrictTo(o)
+}
+
+func (s *Stage) GetExportValue(exp *Export) (any, error) {
+
+	caps, err := exp.Capabilities(s)
+	if err != nil {
+		return nil, err
+	}
+
+	c, exists := caps[exp.Capability]
+	if !exists {
+		return nil, fmt.Errorf("capability %q not found", exp.Capability)
+	}
+
+	paths, err := patch.ParsePath("/" + patch.TrimForPath(exp.Path))
+	if err != nil {
+		return nil, err
+	}
+	d := c.Store.Clone()
+	data, ok := d.Get(paths...)
+	if !ok {
+		return nil, fmt.Errorf("export path %q not found in capability %q", exp.Path, exp.Capability)
+	}
+
+	return data, nil
 }

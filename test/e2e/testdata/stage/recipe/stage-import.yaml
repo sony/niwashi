@@ -1,0 +1,15 @@
+version: nws.recipe/v1
+kind: node
+metadata:
+  id: integ-test/stage-import
+  version: 1.0.0
+spec:
+  defaults:
+    params:
+      dns: "none"
+  tasks:
+    - name: construct
+      action:
+        exec.local:
+          scriptTpl: |
+            echo "construct import ca={{ .Params.ca }} dns={{ .Params.dns }}" >> "@MARKER_FILE@"

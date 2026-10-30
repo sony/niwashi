@@ -6,8 +6,10 @@ package cluster_test
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/sony/niwashi/internal/cap"
 	"github.com/sony/niwashi/internal/cluster"
+	"github.com/sony/niwashi/internal/types"
 )
 
 func TestCluster_Validate(t *testing.T) {
@@ -109,4 +111,71 @@ func TestCluster_Validate(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestCluster_ApplyTemplate_Precedence follows the user guide (templates.md):
+// the definition of the cluster overrides its templates, and a later template
+// overrides an earlier one.
+func TestCluster_ApplyTemplate_Precedence(t *testing.T) {
+	tpl := map[string]*cluster.Template{
+		"template-a": {
+			Version: "1.27",
+			Params:  types.Params{"network": "calico", "replicas": 1, "region": "us-east"},
+			Capabilities: cap.CapabilityList{
+				"org/k8s": {Params: types.Params{"cni": "calico", "proxy": "iptables"}},
+			},
+		},
+		"template-b": {
+			Version: "1.28",
+			Params:  types.Params{"network": "cilium", "replicas": 3},
+			Capabilities: cap.CapabilityList{
+				"org/k8s": {Params: types.Params{"cni": "cilium"}},
+			},
+		},
+	}
+
+	t.Run("cluster overrides the templates", func(t *testing.T) {
+		c := &cluster.Cluster{
+			Templates: []string{"template-a", "template-b"},
+			Version:   "1.29",
+			Params:    types.Params{"replicas": 5},
+			Capabilities: cap.CapabilityList{
+				"org/k8s": {Params: types.Params{"cni": "flannel"}},
+			},
+		}
+		if err := c.ApplyTemplate(tpl); err != nil {
+			t.Fatalf("ApplyTemplate() error = %v", err)
+		}
+		if c.Version != "1.29" {
+			t.Errorf("version = %q, want %q (the cluster overrides the templates)", c.Version, "1.29")
+		}
+		wantParams := types.Params{
+			"replicas": 5,         // the cluster overrides both templates
+			"network":  "cilium",  // template-b overrides template-a
+			"region":   "us-east", // only in template-a
+		}
+		if diff := cmp.Diff(wantParams, c.Params); diff != "" {
+			t.Errorf("params mismatch (-want +got):\n%s", diff)
+		}
+		wantCapParams := types.Params{
+			"cni":   "flannel",  // the cluster overrides both templates
+			"proxy": "iptables", // only in template-a
+		}
+		if diff := cmp.Diff(wantCapParams, c.Capabilities["org/k8s"].Params); diff != "" {
+			t.Errorf("capability params mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("later template overrides an earlier one", func(t *testing.T) {
+		c := &cluster.Cluster{Templates: []string{"template-a", "template-b"}}
+		if err := c.ApplyTemplate(tpl); err != nil {
+			t.Fatalf("ApplyTemplate() error = %v", err)
+		}
+		if c.Version != "1.28" {
+			t.Errorf("version = %q, want %q (template-b overrides template-a)", c.Version, "1.28")
+		}
+		if got := c.Capabilities["org/k8s"].Params["cni"]; got != "cilium" {
+			t.Errorf("capability param cni = %v, want %q (template-b overrides template-a)", got, "cilium")
+		}
+	})
 }

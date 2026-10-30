@@ -58,7 +58,6 @@ func Load(p string, opener file.Opener) (*State, error) {
 
 	state.Hash = hash
 
-	// todo: validate
 	state.SetDefaults()
 
 	return &state, nil

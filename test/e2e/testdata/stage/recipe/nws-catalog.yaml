@@ -4,3 +4,7 @@ recipes:
     path: ./stage-host.yaml
   stage-node:
     path: ./stage-node.yaml
+  stage-export:
+    path: ./stage-export.yaml
+  stage-import:
+    path: ./stage-import.yaml

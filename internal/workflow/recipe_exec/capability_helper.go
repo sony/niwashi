@@ -20,27 +20,49 @@ func CapabilityRoot(prefix string, r RecipeSpec, target string) string {
 	return fmt.Sprintf("%s/%s/capabilities/%s", prefix, target, escapedId)
 }
 
-func AddCapability(
-	prefix string,
-	sm workflow.StateManager,
-	r RecipeSpec,
-	target string,
-	job *workflow.Job) error {
+func getDataFrom(job *workflow.Job) (map[string]any, types.Imports, error) {
 
-	path := CapabilityRoot(prefix, r, target)
-	params := types.Params{}
+	params := map[string]any{}
 	if p, exists := job.GetFromData("params"); exists {
 		if x, ok := p.(map[string]any); ok {
 			params = x
 		}
 	}
 
-	err := sm.ApplyPatches([]patch.Patch{
+	var imports types.Imports
+	if i, exists := job.GetFromData("import"); exists {
+		var err error
+		imports, err = importsFrom(i)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return params, imports, nil
+}
+
+func AddCapability(
+	prefix string,
+	sm workflow.StateManager,
+	r RecipeSpec,
+	target string,
+	job *workflow.Job,
+	imported map[string]string) error {
+
+	path := CapabilityRoot(prefix, r, target)
+	params, imports, err := getDataFrom(job)
+	if err != nil {
+		return errors.Join(fmt.Errorf("failed to decode import of the job"), err)
+	}
+
+	err = sm.ApplyPatches([]patch.Patch{
 		patch.NewAddPatch(
 			path,
 			&cap.Capability{
-				Version: r.GetVersion(),
-				Params:  params,
+				Version:  r.GetVersion(),
+				Params:   params,
+				Import:   imports,
+				Imported: imported,
 			},
 		)}, nil, nil)
 
@@ -56,17 +78,16 @@ func UpdateCapability(
 	sm workflow.StateManager,
 	r RecipeSpec,
 	target string,
-	job *workflow.Job) error {
+	job *workflow.Job,
+	imported map[string]string) error {
 
 	path := CapabilityRoot(prefix, r, target)
-	params := map[string]any{}
-	if p, exists := job.GetFromData("params"); exists {
-		if x, ok := p.(map[string]any); ok {
-			params = x
-		}
+	params, imports, err := getDataFrom(job)
+	if err != nil {
+		return errors.Join(fmt.Errorf("failed to decode import of the job"), err)
 	}
 
-	err := sm.ApplyPatches([]patch.Patch{
+	err = sm.ApplyPatches([]patch.Patch{
 		patch.NewAddPatch(
 			path+"/version",
 			r.GetVersion(),
@@ -74,6 +95,14 @@ func UpdateCapability(
 		patch.NewAddPatch(
 			path+"/params",
 			params,
+		),
+		patch.NewAddPatch(
+			path+"/import",
+			imports,
+		),
+		patch.NewAddPatch(
+			path+"/imported",
+			imported,
 		),
 	}, nil, nil)
 

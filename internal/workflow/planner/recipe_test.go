@@ -106,13 +106,13 @@ func TestRecipeDagVertex_BuildRequiresEdge_ReusesExistingVertex(t *testing.T) {
 	// vertex for lib (e.g. carrying real params from the diff walk, or the
 	// "update" flag). The auto-expansion in BuildRequiresEdge must not
 	// clobber this with a plain, param-less vertex for the same recipe.
-	existingLibVtx, err := planner.NewRecipeDagVertex(workflow.PhaseNode, "node-1", lib, types.Dict{"memory": "4096"}, finder, nil)
+	existingLibVtx, err := planner.NewRecipeDagVertex(workflow.PhaseNode, "node-1", lib, types.Dict{"memory": "4096"}, finder, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to build fixture vertex: %v", err)
 	}
 	ctx.AddVertex(existingLibVtx)
 
-	appVtx, err := planner.NewRecipeDagVertex(workflow.PhaseNode, "node-1", app, nil, finder, nil)
+	appVtx, err := planner.NewRecipeDagVertex(workflow.PhaseNode, "node-1", app, nil, finder, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to build fixture vertex: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestRecipeDagVertex_BuildRequiresEdge_SkipsAlreadySatisfiedDependency(t *te
 		t.Fatalf("NewContext failed: %v", err)
 	}
 
-	appVtx, err := planner.NewRecipeDagVertex(workflow.PhaseNode, "node-1", app, nil, finder, nil)
+	appVtx, err := planner.NewRecipeDagVertex(workflow.PhaseNode, "node-1", app, nil, finder, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to build fixture vertex: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestRecipeDagVertex_BuildRequiresEdge_AddsGenuinelyNewDependencyRecursively
 		t.Fatalf("NewContext failed: %v", err)
 	}
 
-	appVtx, err := planner.NewRecipeDagVertex(workflow.PhaseNode, "node-1", app, nil, finder, nil)
+	appVtx, err := planner.NewRecipeDagVertex(workflow.PhaseNode, "node-1", app, nil, finder, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to build fixture vertex: %v", err)
 	}
@@ -412,7 +412,7 @@ func TestRecipeDagVertex_BuildRequiresEdge_AddsHostVertexToInitGraph(t *testing.
 		t.Fatalf("NewContext failed: %v", err)
 	}
 
-	appVtx, err := planner.NewRecipeDagVertex(workflow.PhaseNode, "node-1", app, nil, finder, nil)
+	appVtx, err := planner.NewRecipeDagVertex(workflow.PhaseNode, "node-1", app, nil, finder, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to build fixture vertex: %v", err)
 	}
@@ -452,7 +452,7 @@ func TestRecipeDagVertex_BuildRequiresEdge_SharesHostVertexAcrossStages(t *testi
 		if err != nil {
 			t.Fatalf("WithStage(%q) failed: %v", stage, err)
 		}
-		appVtx, err := planner.NewRecipeDagVertex(workflow.PhaseNode, "node-1", app, nil, finder, nil)
+		appVtx, err := planner.NewRecipeDagVertex(workflow.PhaseNode, "node-1", app, nil, finder, nil, nil)
 		if err != nil {
 			t.Fatalf("failed to build fixture vertex: %v", err)
 		}

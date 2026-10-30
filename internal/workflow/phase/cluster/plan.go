@@ -53,7 +53,7 @@ func (p *ClusterCapPlanner) BuildVertices(ctx planner.Context) error {
 			}
 
 			vtx, err := planner.NewRecipeDagVertex(
-				workflow.PhaseCluster, clusterName, r, cap.Params, ctx, diff.BaseVertexData)
+				workflow.PhaseCluster, clusterName, r, cap.Params, ctx, diff.BaseVertexData, cap.Import)
 			if err != nil {
 				return err
 			}

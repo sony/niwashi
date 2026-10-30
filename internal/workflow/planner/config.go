@@ -153,6 +153,12 @@ func (cfg *Config) LoadTargetState() (*state.State, error) {
 		}
 	}
 	target.SetDefaults()
+
+	if err := target.Validate(); err != nil {
+		logger.Error("invalid target state:", "error", err)
+		return nil, err
+	}
+
 	return target, nil
 }
 

@@ -4,6 +4,7 @@
 package state_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/sony/niwashi/internal/cluster"
@@ -260,9 +261,13 @@ func TestState_Compact(t *testing.T) {
 		},
 		{
 			// export refers to the nodes or clusters in the same stage
-			name:  "stage with only export",
-			stage: &state.Stage{Export: types.Dict{"x": types.Dict{"node": "gateway"}}},
-			want:  false,
+			name: "stage with only export",
+			stage: &state.Stage{Export: state.Exports{
+				"x": &state.Export{
+					Node: "gateway",
+				},
+			}},
+			want: false,
 		},
 		{
 			name: "stage with a node",
@@ -324,4 +329,96 @@ func TestState_Compact_Nil(t *testing.T) {
 	s = state.NewState()
 	s.Stages = nil
 	s.Compact() // must not panic
+}
+
+func TestState_ValidateImports(t *testing.T) {
+	order := []string{"bootstrap", state.MainStageName}
+	exportStage := func() *state.Stage {
+		return exportTestStage(map[string][]string{"gateway": {"org/squid-proxy"}}, importExports())
+	}
+
+	tests := []struct {
+		name    string
+		target  *state.State
+		initial *state.State
+		wantErr string // empty means no error
+	}{
+		{
+			name: "main stage imports an export of the pre-stage",
+			target: func() *state.State {
+				s := exportTestState(map[string]*state.Stage{"bootstrap": exportStage()})
+				s.Inventory = importStage(nil, importOf(importExportName, false)).Inventory
+				return s
+			}(),
+			initial: state.NewState(),
+		},
+		{
+			// the default plan keeps the export only in the initial state
+			name: "export only in the initial state",
+			target: func() *state.State {
+				s := exportTestState(map[string]*state.Stage{"bootstrap": exportTestStage(nil, nil)})
+				s.Inventory = importStage(nil, importOf(importExportName, false)).Inventory
+				return s
+			}(),
+			initial: exportTestState(map[string]*state.Stage{"bootstrap": exportStage()}),
+		},
+		{
+			// a stage can import only from the preceding stages
+			name: "pre-stage imports its own export",
+			target: exportTestState(map[string]*state.Stage{
+				"bootstrap": func() *state.Stage {
+					s := exportStage()
+					s.Inventory.Nodes["cp"] = importStage(nil, importOf(importExportName, false)).Inventory.Nodes["cp"]
+					return s
+				}(),
+			}),
+			initial: state.NewState(),
+			wantErr: `stage "bootstrap"`,
+		},
+		{
+			name: "main stage imports an export that no stage defines",
+			target: func() *state.State {
+				s := exportTestState(map[string]*state.Stage{"bootstrap": exportTestStage(nil, nil)})
+				s.Inventory = importStage(nil, importOf(importExportName, false)).Inventory
+				return s
+			}(),
+			initial: state.NewState(),
+			wantErr: `stage "main"`,
+		},
+		{
+			name: "no pre-stage, optional import",
+			target: func() *state.State {
+				s := state.NewState()
+				s.Inventory = importStage(types.Params{importParam: "/etc/ca.pem"}, importOf(importExportName, true)).Inventory
+				return s
+			}(),
+			initial: state.NewState(),
+		},
+		{
+			name: "nil initial state",
+			target: func() *state.State {
+				s := exportTestState(map[string]*state.Stage{"bootstrap": exportStage()})
+				s.Inventory = importStage(nil, importOf(importExportName, false)).Inventory
+				return s
+			}(),
+			initial: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.target.ValidateImports(order, tt.initial)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("ValidateImports() error = %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("ValidateImports() succeeded unexpectedly")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("ValidateImports() error = %v, want %q in it", err, tt.wantErr)
+			}
+		})
+	}
 }
