@@ -93,6 +93,19 @@ func (c *Capability) Merge(other *Capability) (*Capability, error) {
 	return clone, nil
 }
 
+// replaceWhole sets a field of a capability that is replaced as a whole.
+func replaceWhole[T any](field string, rest []string, value any, set func(T)) error {
+	if len(rest) != 0 {
+		return fmt.Errorf("invalid path for capability %s: %v", field, rest)
+	}
+	v, ok := value.(T)
+	if !ok {
+		return fmt.Errorf("invalid value type for capability %s: %T", field, value)
+	}
+	set(v)
+	return nil
+}
+
 func (c *Capability) Add(path []string, value any) error {
 	if len(path) == 0 {
 		return fmt.Errorf("path is required to add capability")
@@ -100,29 +113,13 @@ func (c *Capability) Add(path []string, value any) error {
 
 	switch path[0] {
 	case "version":
-		if len(path) == 1 {
-			v, ok := value.(string)
-			if !ok {
-				return fmt.Errorf("invalid value type for capability version: %T", value)
-			}
+		return replaceWhole("version", path[1:], value, func(v string) {
 			c.Version = v
-			return nil
-		}
-		// deny adding nested paths under version
-		return fmt.Errorf("invalid path for capability version: %v", path[1:])
+		})
 	case "params":
-		if len(path) == 1 {
-			v, ok := value.(map[string]any)
-			if !ok {
-				return fmt.Errorf("invalid value type for capability params: %T", value)
-			}
+		return replaceWhole("params", path[1:], value, func(v map[string]any) {
 			c.Params = types.CloneMap(v)
-			return nil
-		}
-
-		// deny adding nested paths under params
-		return fmt.Errorf("invalid path for capability params: %v", path[1:])
-
+		})
 	case "store":
 		if len(path) == 1 {
 			v, ok := value.(map[string]any)
@@ -137,17 +134,15 @@ func (c *Capability) Add(path []string, value any) error {
 		}
 		return c.Store.SetPath(value, path[1:]...)
 
-	case "imported":
-		if len(path) == 1 {
-			v, ok := value.(map[string]string)
-			if !ok {
-				return fmt.Errorf("invalid value type for capability imported: %T", value)
-			}
-			c.Imported = maps.Clone(v)
-			return nil
-		}
+	case "import":
+		return replaceWhole("import", path[1:], value, func(v types.Imports) {
+			c.Import = v.Clone()
+		})
 
-		return fmt.Errorf("invalid path for capability imported: %v", path[1:])
+	case "imported":
+		return replaceWhole("imported", path[1:], value, func(v map[string]string) {
+			c.Imported = maps.Clone(v)
+		})
 
 	default:
 		return fmt.Errorf("unsupported path for capability: %s", path[0])

@@ -168,6 +168,64 @@ func TestCapability_Add(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			// import is replaced as a whole, so a param removed from the State is removed
+			name: "import: whole value replaced, others kept",
+			cap: &cap.Capability{
+				Version: "0.0.1",
+				Params:  types.Params{"memory": "1024"},
+				Import:  types.Imports{"cert": {From: "old_cert"}, "key": {From: "old_key"}},
+			},
+			path:  []string{"import"},
+			value: types.Imports{"cert": {From: "proxy_ca_cert", Optional: true}},
+			expect: &cap.Capability{
+				Version: "0.0.1",
+				Params:  types.Params{"memory": "1024"},
+				Import:  types.Imports{"cert": {From: "proxy_ca_cert", Optional: true}},
+			},
+			wantErr: false,
+		},
+		{
+			// the capability no longer has import
+			name: "import: typed nil removes it",
+			cap: &cap.Capability{
+				Version: "0.0.1",
+				Import:  types.Imports{"cert": {From: "old_cert"}},
+			},
+			path:    []string{"import"},
+			value:   types.Imports(nil),
+			expect:  &cap.Capability{Version: "0.0.1"},
+			wantErr: false,
+		},
+		{
+			// the callers always pass types.Imports, so a nil without the type is rejected
+			name: "import: untyped nil is an invalid value type",
+			cap: &cap.Capability{
+				Version: "0.0.1",
+				Import:  types.Imports{"cert": {From: "old_cert"}},
+			},
+			path:    []string{"import"},
+			value:   nil,
+			wantErr: true,
+		},
+		{
+			// the form read back from plan.json must be decoded by the caller
+			name:    "import: invalid value type",
+			cap:     &cap.Capability{Version: "0.0.1"},
+			path:    []string{"import"},
+			value:   map[string]any{"cert": map[string]any{"from": "proxy_ca_cert"}},
+			wantErr: true,
+		},
+		{
+			name: "import: nested path is denied",
+			cap: &cap.Capability{
+				Version: "0.0.1",
+				Import:  types.Imports{"cert": {From: "old_cert"}},
+			},
+			path:    []string{"import", "cert"},
+			value:   &types.Import{From: "proxy_ca_cert"},
+			wantErr: true,
+		},
+		{
 			// imported is replaced as a whole, so a key no longer injected is removed
 			name: "imported: whole value replaced, others kept",
 			cap: &cap.Capability{

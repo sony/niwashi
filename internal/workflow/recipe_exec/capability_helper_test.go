@@ -354,3 +354,104 @@ func TestUpdateCapability_Imported(t *testing.T) {
 		})
 	}
 }
+
+// importJobData returns the job data with import in the form read back from
+// plan.json (nwsctl plan writes it, nwsctl apply reads it back).
+func importJobData() map[string]any {
+	return map[string]any{
+		"params": map[string]any{"update": true},
+		"import": map[string]any{
+			"cert": map[string]any{"from": "proxy_ca_cert"},
+			"key":  map[string]any{"from": "proxy_key", "optional": true},
+		},
+	}
+}
+
+var wantImports = types.Imports{
+	"cert": {From: "proxy_ca_cert"},
+	"key":  {From: "proxy_key", Optional: true},
+}
+
+func TestAddCapability_Import(t *testing.T) {
+	tests := []struct {
+		name    string
+		jobData any
+		want    types.Imports
+	}{
+		{name: "decoded from plan.json", jobData: importJobData(), want: wantImports},
+		{name: "as types.Imports", jobData: map[string]any{"import": wantImports}, want: wantImports},
+		{name: "no import", jobData: map[string]any{"params": map[string]any{}}, want: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sm := &fakeStateManager{}
+			r := newTestRecipeSpec("my/recipe", "1.0.0")
+
+			if err := recipe_exec.AddCapability("/inventory/nodes", sm, r, "node-1", &workflow.Job{Data: tt.jobData}, nil); err != nil {
+				t.Fatalf("AddCapability() error = %v", err)
+			}
+			if len(sm.patches) != 1 {
+				t.Fatalf("expected exactly 1 patch to be applied, got %d", len(sm.patches))
+			}
+			c := sm.patches[0].(*patch.AddPatch).Value.(*cap.Capability)
+			if !reflect.DeepEqual(c.Import, tt.want) {
+				t.Errorf("Import = %v, want %v", c.Import, tt.want)
+			}
+		})
+	}
+
+	t.Run("invalid import is an error and applies no patch", func(t *testing.T) {
+		sm := &fakeStateManager{}
+		r := newTestRecipeSpec("my/recipe", "1.0.0")
+		job := &workflow.Job{Data: map[string]any{"import": "not-a-map"}}
+
+		if err := recipe_exec.AddCapability("/inventory/nodes", sm, r, "node-1", job, nil); err == nil {
+			t.Fatal("AddCapability() succeeded unexpectedly")
+		}
+		if len(sm.patches) != 0 {
+			t.Errorf("patches = %v, want none", sm.patches)
+		}
+	})
+}
+
+func TestUpdateCapability_Import(t *testing.T) {
+	existing := newExistingCapability()
+	existing.Import = types.Imports{"cert": {From: "old_cert"}, "ca": {From: "old_ca"}}
+
+	tests := []struct {
+		name    string
+		jobData any
+		want    types.Imports
+	}{
+		{name: "replaced as a whole", jobData: importJobData(), want: wantImports},
+		{name: "removed when the job has no import", jobData: map[string]any{"params": map[string]any{}}, want: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sm := applier.NewStateManager(nodeStateWith(existing.Clone()))
+			r := newTestRecipeSpec("my/recipe", "1.1.0")
+
+			if err := recipe_exec.UpdateCapability("/inventory/nodes", sm, r, "node-1", &workflow.Job{Data: tt.jobData}, nil); err != nil {
+				t.Fatalf("UpdateCapability() error = %v", err)
+			}
+			got := lookupCapability(sm.State(), "/inventory/nodes", "node-1", "my/recipe")
+			if !reflect.DeepEqual(got.Import, tt.want) {
+				t.Errorf("Import = %v, want %v", got.Import, tt.want)
+			}
+		})
+	}
+
+	t.Run("invalid import is an error and leaves the state unchanged", func(t *testing.T) {
+		sm := applier.NewStateManager(nodeStateWith(existing.Clone()))
+		r := newTestRecipeSpec("my/recipe", "1.1.0")
+		job := &workflow.Job{Data: map[string]any{"import": "not-a-map"}}
+
+		if err := recipe_exec.UpdateCapability("/inventory/nodes", sm, r, "node-1", job, nil); err == nil {
+			t.Fatal("UpdateCapability() succeeded unexpectedly")
+		}
+		got := lookupCapability(sm.State(), "/inventory/nodes", "node-1", "my/recipe")
+		if !reflect.DeepEqual(got, existing) {
+			t.Errorf("capability = %#v, want unchanged %#v", got, existing)
+		}
+	})
+}

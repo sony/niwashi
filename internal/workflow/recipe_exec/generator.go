@@ -321,6 +321,18 @@ func parseOptions(job *workflow.Job) (fqid string, phase string, target string) 
 	return fqid, phase, target
 }
 
+func importsFrom(i any) (types.Imports, error) {
+	jsonBytes, err := json.Marshal(i)
+	if err != nil {
+		return nil, err
+	}
+	var imp types.Imports
+	if err := json.Unmarshal(jsonBytes, &imp); err != nil {
+		return nil, err
+	}
+	return imp, nil
+}
+
 func createUserParams(job *workflow.Job, exportValues map[string]any) (map[string]any, map[string]string, error) {
 	params := map[string]any{}
 	imported := map[string]string{}
@@ -340,13 +352,8 @@ func createUserParams(job *workflow.Job, exportValues map[string]any) (map[strin
 
 	// resolve import data
 	if i, found := d.(map[string]any)["import"]; found {
-		// any to types.Imports
-		jsonBytes, err := json.Marshal(i)
+		imp, err := importsFrom(i)
 		if err != nil {
-			return nil, nil, err
-		}
-		var imp types.Imports
-		if err := json.Unmarshal(jsonBytes, &imp); err != nil {
 			return nil, nil, err
 		}
 
