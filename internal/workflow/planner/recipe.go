@@ -6,6 +6,7 @@ package planner
 import (
 	"errors"
 	"fmt"
+	"maps"
 
 	"github.com/sony/niwashi/internal/cmap"
 	"github.com/sony/niwashi/internal/logger"
@@ -45,7 +46,7 @@ func NewRecipeDagVertex(
 	imports types.Imports) (*RecipeDagVertex, error) {
 	fqid := r.Fqid()
 
-	data := baseVertexData
+	data := maps.Clone(baseVertexData)
 	if data == nil {
 		data = make(map[string]any)
 	}
