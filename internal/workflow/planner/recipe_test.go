@@ -92,6 +92,44 @@ func hasEdge(g *workflow.DagGraph, fromId, toId string) bool {
 	return false
 }
 
+// TestNewRecipeDagVertex_DoesNotShareBaseVertexData checks that vertices built
+// from the same base vertex data, such as the "update" flag of an update diff,
+// keep their own params and import.
+func TestNewRecipeDagVertex_DoesNotShareBaseVertexData(t *testing.T) {
+	r := newFixtureRecipe(recipe.KindNode, "test/node-capability")
+	base := map[string]any{"update": true}
+
+	v1, err := planner.NewRecipeDagVertex(workflow.PhaseNode, "node1", r,
+		types.Dict{"memory": "2048"}, nil, base, types.Imports{"ca": {From: "proxy_ca_cert"}})
+	if err != nil {
+		t.Fatalf("NewRecipeDagVertex() error = %v", err)
+	}
+	v2, err := planner.NewRecipeDagVertex(workflow.PhaseNode, "node2", r,
+		types.Dict{"memory": "4096"}, nil, base, nil)
+	if err != nil {
+		t.Fatalf("NewRecipeDagVertex() error = %v", err)
+	}
+
+	want1 := types.Dict{
+		"update": true,
+		"params": types.Dict{"memory": "2048"},
+		"import": types.Imports{"ca": {From: "proxy_ca_cert"}},
+	}
+	if !reflect.DeepEqual(v1.Data, want1) {
+		t.Errorf("data of node1 = %v, want %v", v1.Data, want1)
+	}
+	want2 := types.Dict{
+		"update": true,
+		"params": types.Dict{"memory": "4096"},
+	}
+	if !reflect.DeepEqual(v2.Data, want2) {
+		t.Errorf("data of node2 = %v, want %v", v2.Data, want2)
+	}
+	if want := map[string]any{"update": true}; !reflect.DeepEqual(base, want) {
+		t.Errorf("base vertex data = %v, want unchanged %v", base, want)
+	}
+}
+
 func TestRecipeDagVertex_BuildRequiresEdge_ReusesExistingVertex(t *testing.T) {
 	lib := newFixtureRecipe(recipe.KindNode, "org/lib")
 	app := newFixtureRecipe(recipe.KindNode, "org/app", "org/lib")
